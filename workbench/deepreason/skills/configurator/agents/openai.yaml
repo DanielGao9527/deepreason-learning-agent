@@ -1,0 +1,4 @@
+interface:
+  display_name: "Configurator"
+  short_description: "Generate and explain configs"
+  default_prompt: "Use $configurator to configure a new heavy-reasoning agent project."

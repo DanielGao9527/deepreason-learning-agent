@@ -1,0 +1,4 @@
+interface:
+  display_name: "Testing Verification"
+  short_description: "Acceptance and regression checks"
+  default_prompt: "Use $testing-verification to define and run evidence-backed acceptance checks."

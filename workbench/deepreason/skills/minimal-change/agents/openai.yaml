@@ -1,0 +1,4 @@
+interface:
+  display_name: "Minimal Change"
+  short_description: "Small evidence-backed edits"
+  default_prompt: "Use $minimal-change to plan a narrow, reversible code or config edit."

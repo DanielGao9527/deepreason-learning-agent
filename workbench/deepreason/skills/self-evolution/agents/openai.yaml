@@ -1,0 +1,4 @@
+interface:
+  display_name: "Self Evolution"
+  short_description: "Proposal-only improvement"
+  default_prompt: "Use $self-evolution to propose a skill or config improvement from failures."

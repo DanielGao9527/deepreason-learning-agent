@@ -1,0 +1,122 @@
+{
+  "cases": [
+    {
+      "id": "index_bootstrap_cn",
+      "query": "这套 RAG 知识库初始化时如何建立索引关系",
+      "expected_source": "knowledge/rag_benchmark/01_index_bootstrap.md",
+      "tags": ["chinese", "indexing", "bootstrap"]
+    },
+    {
+      "id": "index_bootstrap_en",
+      "query": "how are BM25 semantic and graph scorers initialized over local chunks",
+      "expected_source": "knowledge/rag_benchmark/01_index_bootstrap.md",
+      "tags": ["english", "indexing"]
+    },
+    {
+      "id": "graph_retry_relation",
+      "query": "which relationship connects an evidence gate failure back to retrieve",
+      "expected_sources": [
+        "knowledge/rag_benchmark/02_graph_relationships.md",
+        "knowledge/rag_eval_test/09_state_machine_workflow.md",
+        "knowledge/state-machine.md"
+      ],
+      "tags": ["graph", "relationship"]
+    },
+    {
+      "id": "graph_cn",
+      "query": "graph 方法怎么根据共现关系扩展查询词",
+      "expected_source": "knowledge/rag_benchmark/02_graph_relationships.md",
+      "tags": ["graph", "chinese"]
+    },
+    {
+      "id": "wiki_policy",
+      "query": "when should wikipedia fallback run after local retrieval confidence is low",
+      "expected_source": "knowledge/rag_benchmark/03_wiki_fallback_policy.md",
+      "tags": ["wiki", "fallback"]
+    },
+    {
+      "id": "wiki_policy_cn",
+      "query": "Wiki 替补项什么时候触发，是否参与本地索引",
+      "expected_source": "knowledge/rag_benchmark/03_wiki_fallback_policy.md",
+      "tags": ["wiki", "chinese"]
+    },
+    {
+      "id": "memory_boundary_cn",
+      "query": "论文 API 文档和用户偏好分别应该放进知识库还是长期记忆",
+      "expected_source": "knowledge/rag_benchmark/04_memory_knowledge_boundary.md",
+      "tags": ["memory", "knowledge", "chinese"]
+    },
+    {
+      "id": "memory_boundary_en",
+      "query": "why should long term memory not be recursively ingested as knowledge documents",
+      "expected_source": "knowledge/rag_benchmark/04_memory_knowledge_boundary.md",
+      "tags": ["memory", "knowledge"]
+    },
+    {
+      "id": "hea_precipitation_cn",
+      "query": "高熵合金中纳米析出相如何影响强度和塑性",
+      "expected_source": "knowledge/rag_benchmark/05_high_entropy_precipitation.md",
+      "tags": ["materials", "chinese"]
+    },
+    {
+      "id": "hea_precipitation_en",
+      "query": "precipitation hardening dislocation motion ductility in high entropy alloys",
+      "expected_sources": [
+        "knowledge/rag_benchmark/05_high_entropy_precipitation.md",
+        "knowledge/rag_eval_test/06_high_entropy_alloy_strength.md"
+      ],
+      "tags": ["materials"]
+    },
+    {
+      "id": "battery_sei_cn",
+      "query": "锂离子电池 SEI 膜生长为什么会导致容量衰减",
+      "expected_source": "knowledge/rag_benchmark/06_battery_sei_degradation.md",
+      "tags": ["battery", "chinese"]
+    },
+    {
+      "id": "workflow_contract_cn",
+      "query": "工作流连线上的交付契约和门禁策略应该包含什么",
+      "expected_source": "knowledge/rag_benchmark/07_workflow_handoff_contract.md",
+      "tags": ["workflow", "chinese"]
+    },
+    {
+      "id": "workflow_contract_en",
+      "query": "editable workflow node should include agent work input output handler checkpoint gate policy",
+      "expected_source": "knowledge/rag_benchmark/07_workflow_handoff_contract.md",
+      "tags": ["workflow"]
+    },
+    {
+      "id": "reranker_en",
+      "query": "why use a cross encoder reranker after first stage retrieval",
+      "expected_sources": [
+        "knowledge/rag_benchmark/08_cross_encoder_reranking.md",
+        "knowledge/rag_eval_test/04_cross_encoder_reranker.md"
+      ],
+      "tags": ["reranking"]
+    },
+    {
+      "id": "user_experience_cn",
+      "query": "用户经验什么时候可以作为证据，能不能当成科学证明",
+      "expected_source": "knowledge/rag_benchmark/09_user_experience_evidence.md",
+      "tags": ["evidence", "chinese"]
+    },
+    {
+      "id": "secret_rotation_cn",
+      "query": "密钥轮换为什么不能把 API key 写进仓库配置",
+      "expected_source": "knowledge/rag_benchmark/10_secret_rotation_security.md",
+      "tags": ["security", "chinese"]
+    },
+    {
+      "id": "multilingual_cn",
+      "query": "中文问题里的证据门禁应该映射到哪些英文检索词",
+      "expected_source": "knowledge/rag_benchmark/11_multilingual_mapping.md",
+      "tags": ["multilingual", "chinese"]
+    },
+    {
+      "id": "recall_metrics_cn",
+      "query": "Recall@1 Recall@3 Recall@5 分别如何衡量 RAG 效果",
+      "expected_source": "knowledge/rag_benchmark/12_recall_metrics.md",
+      "tags": ["evaluation", "chinese"]
+    }
+  ]
+}

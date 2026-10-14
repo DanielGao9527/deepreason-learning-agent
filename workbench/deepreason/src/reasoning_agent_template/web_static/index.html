@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agent 调试控制台</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <h1>Agent 调试控制台</h1>
+            <p id="runtimeLine">正在加载运行时...</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <span class="llm-toggle" title="所有回答都必须由 DeepSeek API 生成">DeepSeek 必须</span>
+          <button id="refreshButton" type="button">刷新</button>
+        </div>
+      </header>
+
+      <main class="debug-grid">
+        <section class="conversation-panel" aria-label="对话">
+          <div class="section-head">
+            <h2>对话</h2>
+            <span id="runId">暂无运行</span>
+          </div>
+          <div class="conversation-modes" aria-label="对话模式">
+            <button id="chatModeButton" class="active" type="button" data-chat-mode="chat">普通对话</button>
+            <button id="builderModeButton" type="button" data-chat-mode="builder">搭建助手</button>
+          </div>
+          <p id="conversationModeHint" class="conversation-mode-hint">
+            普通对话。输入 /配置、/搭建、#配置 或 #搭建 可以临时启用搭建助手。
+          </p>
+          <div id="messages" class="messages" aria-live="polite"></div>
+          <form id="chatForm" class="composer">
+            <textarea
+              id="messageInput"
+              name="message"
+              rows="4"
+              placeholder="输入消息，回答将由 DeepSeek API 生成..."
+            ></textarea>
+            <button id="sendButton" type="submit">发送</button>
+          </form>
+        </section>
+
+        <section class="monitor-panel" aria-label="调试监控">
+          <div class="status-strip">
+            <div class="metric">
+              <span>多 Agent 运行时</span>
+              <strong id="agentStatus">idle</strong>
+            </div>
+            <div class="metric">
+              <span>当前节点</span>
+              <strong id="stateStatus">idle</strong>
+            </div>
+            <div class="metric">
+              <span>路由 / 工作流</span>
+              <strong id="routingStatus">idle</strong>
+            </div>
+            <div class="metric">
+              <span>证据系统</span>
+              <strong id="evidenceCount">0</strong>
+            </div>
+            <div class="metric">
+              <span>RAG / 外部证据</span>
+              <strong id="ragCount">0</strong>
+            </div>
+          </div>
+
+          <div id="progressBanner" class="progress-banner" aria-live="polite">
+            <span id="workingAgent">等待运行</span>
+            <strong id="workingStage">idle</strong>
+            <p id="workingHint">发送消息后，这里会显示当前 Agent、工作流节点和执行提示。</p>
+          </div>
+
+          <div class="monitor-layout">
+            <section class="panel agent-panel">
+              <div class="section-head">
+                <h2>多 Agent</h2>
+                <span id="agentCount">0 个已加载</span>
+              </div>
+              <div id="agentsList" class="agent-list"></div>
+            </section>
+
+            <section class="panel state-panel">
+              <div class="section-head">
+                <h2>工作流点线图</h2>
+                <span id="currentStage">idle</span>
+              </div>
+              <div id="workflowGraph" class="workflow-graph" aria-label="工作流点线图"></div>
+            </section>
+
+            <section class="panel detail-panel">
+              <div class="tabs" role="tablist" aria-label="调试详情">
+                <button class="tab active" data-tab="evidence" type="button">证据</button>
+                <button class="tab" data-tab="routing" type="button">路由/审查</button>
+                <button class="tab" data-tab="rag" type="button">RAG</button>
+                <button class="tab" data-tab="external" type="button">外部证据</button>
+                <button class="tab" data-tab="workflow" type="button">工作流</button>
+                <button class="tab" data-tab="gates" type="button">门禁</button>
+                <button class="tab" data-tab="memory" type="button">记忆</button>
+                <button class="tab" data-tab="skills" type="button">技能</button>
+                <button class="tab" data-tab="events" type="button">事件</button>
+                <button class="tab" data-tab="raw" type="button">原始 JSON</button>
+              </div>
+              <div id="tabContent" class="tab-content"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/assets/vendor/cytoscape.min.js"></script>
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

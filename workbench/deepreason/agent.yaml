@@ -1,0 +1,103 @@
+identity:
+  name: reasoning-agent-template
+  purpose: Build evidence-first heavy-reasoning agents with state gates, knowledge, memory, and reviewed self-evolution.
+  audience: agent developers
+  failure_boundaries:
+    - never answer key claims without evidence
+    - never mutate files, memory, or skills without gates
+    - never self-evolve by directly editing protected assets
+
+models:
+  planner:
+    provider: deepseek
+    model: deepseek-v4-flash
+  worker:
+    provider: deepseek
+    model: deepseek-v4-flash
+  critic:
+    provider: deepseek
+    model: deepseek-v4-flash
+  grader:
+    provider: deepseek
+    model: deepseek-v4-flash
+
+knowledge:
+  directory: knowledge
+  index_type: hybrid
+  retrieval_methods:
+    - bm25
+    - semantic
+    - graph
+  fallback_methods:
+    - wiki
+  top_k: 5
+  min_score: 0.1
+  chunk_size: 1400
+  fallback_min_score: 0.35
+  fallback_top_k: 2
+  wiki_top_k: 2
+  wiki_enabled: true
+  external_top_k: 5
+  external_timeout_seconds: 8
+
+memory:
+  directory: memory
+  partitions:
+    - semantic
+    - episodic
+    - procedural
+    - project
+    - user
+  read_only_partitions:
+    - shared
+  write_requires_gate: true
+
+gates:
+  min_evidence_by_risk:
+    low: 1
+    medium: 1
+    high: 2
+    critical: 2
+  approval_required_actions:
+    - write_file
+    - write_memory
+    - update_skill
+    - execute_command
+    - external_call
+  workspace_root: .
+
+skills:
+  directory: skills
+  enabled:
+    - project-intake
+    - evidence-first
+    - state-gates
+    - knowledge-rag
+    - memory-consolidation
+    - minimal-change
+    - self-evolution
+    - configurator
+    - testing-verification
+
+evolution:
+  enabled: true
+  proposal_directory: evolution/proposals
+  direct_mutation_allowed: false
+  approval_required: true
+
+runtime:
+  prefer_deepagents: false
+  workflow_max_steps: 32
+  workflow_retry_limit: 1
+  workflow_allow_proposal_loop: false
+  allow_non_localhost: false
+  workflow_spec: configs/workflows/default.workflow.json
+  workflow_draft: configs/workflows/default.workflow.draft.json
+  workflow_proposal_dir: configs/workflows/proposals
+  agents_spec: configs/agents/default.agents.json
+  agents_draft: configs/agents/default.agents.draft.json
+  agents_proposal_dir: configs/agents/proposals
+  template_builtin_dir: configs/templates/builtin
+  template_user_dir: configs/templates/user
+  code_modifier:
+    mode: local_spec

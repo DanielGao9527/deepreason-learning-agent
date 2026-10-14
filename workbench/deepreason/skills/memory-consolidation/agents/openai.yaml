@@ -1,0 +1,4 @@
+interface:
+  display_name: "Memory Consolidation"
+  short_description: "Reviewed long-term memory"
+  default_prompt: "Use $memory-consolidation to decide what should become long-term memory."

@@ -1,0 +1,49 @@
+# DeepReason Learning Agent
+
+基于 [DeepReason Agents Framework](https://github.com/redmaplewww/DeepReason-Agents-Framework) 的计算机知识学习与推论助手。这个仓库保留了可运行的 Python 工作副本，并围绕多角色路由、证据交付、门禁和发布控制做小范围改造。它是 AI 应用开发的学习与评测项目，不是原框架的官方版本。
+
+## 当前能做什么
+
+- 在 PowerShell 中连续提问；概念解释走引导路径，条件比较走严格证据与最终审查路径。
+- 从七份带来源的本地课程资料检索。学习场景在 `retrieve → reason` 交付前核对片段、源文件、哈希和 Evidence Ledger；资料不足时止答。
+- 对明确高风险请求增加只升级的路由下限。Gate 未放行或严格题最终审查失败时，扣留草稿，只交付可公开说明。
+- 按 thread 恢复近期会话；本机 SQLite 在发送真实千问请求前预占名额，默认总上限为 100 次。
+
+上述能力的归属及限制见[改动清单](workbench/PROVENANCE.md)和[项目状态](docs/PROJECT_STATUS.md)。上游的工作流、检索器和 SessionStore 是复用代码；本项目的学习场景、交付检查、发布保护及评测由维护者与 AI 协作完成。
+
+## 运行
+
+需要 Python 3.11+。在仓库根目录的 PowerShell 中：
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe run_learning.py --usage
+.\.venv\Scripts\python.exe scripts\learning_mvp_demo.py
+```
+
+离线演示使用脚本模型，不需要 API Key，也不代表真实答案质量。要实际连续提问，请在**本机环境变量**中设置 `DEEPREASON_QWEN_API_KEY` 或 `DASHSCOPE_API_KEY`，然后运行：
+
+```powershell
+.\.venv\Scripts\python.exe run_learning.py
+```
+
+输入 `/usage` 查看已预占的真实请求次数，`/exit` 退出。不要把 Key 写入仓库；`.env.example` 仅列出配置名，程序不会自动读取它。`workbench/deepreason/learning_mvp/knowledge/` 是小型教学语料，并非完整计算机知识库。
+
+## 验证与边界
+
+在 `workbench/deepreason` 目录运行离线测试：
+
+```powershell
+$env:PYTHONPATH='src'
+..\..\.venv\Scripts\python.exe -m unittest discover -s tests -q
+```
+
+最近一次完整回归及已观察的失败记录见[项目状态](docs/PROJECT_STATUS.md)。评测题与无模型诊断器分别位于 `workbench/deepreason/evals/` 和 `scripts/eval_learning_baseline.py`。当前的“语义”检索是轻量词项相似度，“Graph”是词项共现；没有 Embedding、实体多跳图谱或经过测量的全局答案准确率。Planner 尚非可执行子任务图，只有一条工作流边接入运行时交付契约；名为 `verify` 的上游节点也不核验 Worker 的最终答案。
+
+## 来源
+
+- DeepReason 固定上游提交：`e98313d661527c3aa6677eec08a3b54b4ab88a33`，详情见[来源记录](UPSTREAM.md)。原仓库快照未包含 LICENSE 文件；维护者此前表示已从作者处确认 MIT 授权。这里不把上游代码写成原创成果。
+- OpenDSA 教材原文及本项目中文提要的来源、固定提交、哈希与许可见 `workbench/deepreason/learning_mvp/SOURCE_MANIFEST.json`、`CURATED_SOURCE_MANIFEST.json` 和随附的 `source/OpenDSA/MIT-license.txt`。
+
+本仓库不包含本地密钥、会话、个人记录、调用计数、运行报告、虚拟环境或交接压缩包；固定上游完整快照可通过上述提交获取。

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Knowledge RAG"
+  short_description: "Local retrieval with citations"
+  default_prompt: "Use $knowledge-rag to ground an answer in local project documents."

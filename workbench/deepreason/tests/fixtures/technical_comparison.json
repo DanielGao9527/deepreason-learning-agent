@@ -1,0 +1,55 @@
+{
+  "scenario": "Synthetic FlowRelay version comparison; no real product claims",
+  "question": "Can version 2.2 be recommended over 2.1 for deduplication and throughput?",
+  "documents": [
+    {
+      "id": "v21",
+      "uri": "fixture://flowrelay/2.1",
+      "text": "FlowRelay 2.1 uses at-least-once delivery. It has no request-id deduplication. A benchmark measured 700 messages per second on four CPU cores."
+    },
+    {
+      "id": "v22",
+      "uri": "fixture://flowrelay/2.2",
+      "text": "FlowRelay 2.2 offers optional request-id deduplication. The option must be enabled and a request ID supplied. The deduplication window is 24 hours. A benchmark measured 910 messages per second on eight CPU cores."
+    }
+  ],
+  "cases": [
+    {
+      "id": "valid_binding",
+      "claim": "Version 2.2 supports optional deduplication when enabled and supplied a request ID.",
+      "source": "v22",
+      "excerpt": "The option must be enabled and a request ID supplied.",
+      "expected_structure": "structurally_valid_semantics_unchecked"
+    },
+    {
+      "id": "wrong_source",
+      "claim": "Version 2.2 supports optional deduplication.",
+      "source": "v21",
+      "excerpt": "FlowRelay 2.2 offers optional request-id deduplication.",
+      "expected_structure": "blocked"
+    },
+    {
+      "id": "invented_quote",
+      "claim": "Version 2.2 guarantees deduplication by default.",
+      "source": "v22",
+      "excerpt": "Deduplication is always enabled by default.",
+      "expected_structure": "blocked"
+    },
+    {
+      "id": "contradiction_with_real_quote",
+      "claim": "Version 2.2 enables deduplication by default without a request ID.",
+      "source": "v22",
+      "excerpt": "The option must be enabled and a request ID supplied.",
+      "expected_structure": "structurally_valid_semantics_unchecked",
+      "semantic_gold": "unsupported"
+    },
+    {
+      "id": "confounded_benchmark",
+      "claim": "Version 2.2 improves throughput by 30 percent because of its software changes.",
+      "source": "v22",
+      "excerpt": "A benchmark measured 910 messages per second on eight CPU cores.",
+      "expected_structure": "structurally_valid_semantics_unchecked",
+      "semantic_gold": "unsupported: benchmarks used different CPU counts"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# 阿里云官方 OpenAI-compatible 示例所用 SDK；版本在本项目验证后固定。
+openai==2.54.0

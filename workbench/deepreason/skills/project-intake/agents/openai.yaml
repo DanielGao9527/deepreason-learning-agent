@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Intake"
+  short_description: "Scope and success criteria"
+  default_prompt: "Use $project-intake to turn a vague agent idea into a bounded project brief."

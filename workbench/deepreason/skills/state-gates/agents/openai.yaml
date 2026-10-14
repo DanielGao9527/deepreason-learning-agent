@@ -1,0 +1,4 @@
+interface:
+  display_name: "State Gates"
+  short_description: "Risk, approval, and interrupts"
+  default_prompt: "Use $state-gates to evaluate whether a risky agent action may proceed."

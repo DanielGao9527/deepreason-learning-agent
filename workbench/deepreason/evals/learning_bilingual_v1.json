@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "purpose": "先于术语别名改动固定的中文提问/英文原文片段题；只评价英文来源片段是否进入资格。",
+  "annotation_date": "2026-09-29",
+  "cases": [
+    {
+      "id": "dev_hash_unordered",
+      "split": "dev",
+      "question": "哈希表为什么不按键值大小保存记录？",
+      "expected": "supported",
+      "support": [{"file": "04_opendsa_hashing.txt", "contains": "records are\nnot ordered by value."}],
+      "rationale": "英文原文解释哈希记录不按值排序。"
+    },
+    {
+      "id": "dev_bst_left_rule",
+      "split": "dev",
+      "question": "二叉搜索树的左子树保存什么范围的键？",
+      "expected": "supported",
+      "support": [{"file": "05_opendsa_bst.txt", "contains": "All nodes stored in the left subtree"}],
+      "rationale": "英文原文给出 BST 左子树顺序约束。"
+    },
+    {
+      "id": "dev_hash_exact_match",
+      "split": "dev",
+      "question": "哈希表为什么适合精确匹配查询？",
+      "expected": "supported",
+      "support": [{"file": "04_opendsa_hashing.txt", "contains": "This is known as an exact-match query."}],
+      "rationale": "英文原文给出哈希适用的精确匹配场景。"
+    },
+    {
+      "id": "fresh_hash_key_order",
+      "split": "holdout",
+      "question": "哈希索引为什么难以按键顺序遍历？",
+      "expected": "supported",
+      "support": [{"file": "04_opendsa_hashing.txt", "contains": "visit the records in key order."}],
+      "rationale": "改动前冻结的新问法，检验术语别名是否能触达另一段英文原文。"
+    },
+    {
+      "id": "fresh_bst_sorted_insert",
+      "split": "holdout",
+      "question": "二叉搜索树按升序插入时会变成什么形状？",
+      "expected": "supported",
+      "support": [{"file": "05_opendsa_bst.txt", "contains": "all elements were inserted in\nsorted order."}],
+      "rationale": "改动前冻结的新问法，检验英文原文中插入顺序与形状的解释。"
+    }
+  ]
+}

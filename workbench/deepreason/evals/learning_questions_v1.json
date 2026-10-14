@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "purpose": "人工标注的小型学习语料检索/证据资格基线；不评价模型答案的正确率",
+  "annotation_date": "2026-09-29",
+  "annotation_rule": "supported 表示六份现有资料至少含有列出的关键依据；unsupported 表示该问题的关键定义或操作步骤在当前六份资料中缺失。锚点只核对文本存在，语义判断仍由人工负责。",
+  "cases": [
+    {
+      "id": "hash_collision_definition",
+      "split": "dev",
+      "question": "什么是哈希冲突？",
+      "expected": "supported",
+      "support": [{"file": "01_hash_table.md", "contains": "两个不同的键映射到同一槽位，称为哈希冲突"}],
+      "rationale": "中文提要直接给出冲突定义。"
+    },
+    {
+      "id": "hash_always_constant",
+      "split": "dev",
+      "question": "哈希表查找永远是常数时间吗？",
+      "expected": "supported",
+      "support": [{"file": "01_hash_table.md", "contains": "不能只写“哈希表永远是常数时间”"}],
+      "rationale": "资料明确要求考虑分布、冲突处理和装载情况。"
+    },
+    {
+      "id": "bst_unbalanced_cost",
+      "split": "dev",
+      "question": "普通二叉搜索树插入有序数据后为什么可能变慢？",
+      "expected": "supported",
+      "support": [{"file": "02_search_tree.md", "contains": "退化为链表形状，操作代价接近线性"}],
+      "rationale": "提要明确说明树高与退化条件。"
+    },
+    {
+      "id": "hash_vs_tree_range",
+      "split": "dev",
+      "question": "需要范围查询时，哈希表和二叉搜索树怎么选？",
+      "expected": "supported",
+      "support": [{"file": "03_choice_conditions.md", "contains": "如果任务要求按键排序、顺序遍历或范围查询，树形索引往往更合适"}],
+      "rationale": "选择条件提要直接覆盖范围查询的取舍。"
+    },
+    {
+      "id": "binary_tree_definition",
+      "split": "dev",
+      "question": "二叉树是什么？",
+      "expected": "unsupported",
+      "support": [],
+      "absence_reason": "现有材料定义二叉搜索树并提及 binary tree，但没有独立说明一般二叉树的定义、左右子树与节点度约束。",
+      "rationale": "用户实际止答案例；不能把 BST 的特殊性质当成一般二叉树定义。"
+    },
+    {
+      "id": "bplus_leaf_links",
+      "split": "dev",
+      "question": "B+树叶子节点为什么通常用链表相连？",
+      "expected": "unsupported",
+      "support": [],
+      "absence_reason": "当前资料虽提到 B-tree，但不解释 B+ 树叶子链表结构与原因。",
+      "rationale": "与搜索树相关的相邻概念干扰题。"
+    },
+    {
+      "id": "bst_not_always_balanced",
+      "split": "dev",
+      "question": "二叉搜索树一定自动保持平衡吗？",
+      "expected": "supported",
+      "support": [{"file": "02_search_tree.md", "contains": "“二叉搜索树”与“保证平衡的搜索树”不是同一个性能承诺"}],
+      "rationale": "资料明确区分普通 BST 与保证平衡的搜索树。"
+    },
+    {
+      "id": "complete_vs_full_binary",
+      "split": "dev",
+      "question": "满二叉树和完全二叉树的定义有什么区别？",
+      "expected": "unsupported",
+      "support": [],
+      "absence_reason": "六份材料未给出满二叉树与完全二叉树的定义或判定条件。",
+      "rationale": "与 BST 高度话题相邻，但现有资料不能回答这两个结构定义。"
+    },
+    {
+      "id": "hash_range_limit",
+      "split": "holdout",
+      "question": "普通哈希索引能直接高效完成键值范围查询吗？",
+      "expected": "supported",
+      "support": [{"file": "04_opendsa_hashing.txt", "contains": "Hashing is not a good method for answering range searches."}],
+      "rationale": "固定版英文原文直接说明范围搜索限制。"
+    },
+    {
+      "id": "bst_inorder_sorted",
+      "split": "holdout",
+      "question": "为什么二叉搜索树中序遍历后键值是有序的？",
+      "expected": "supported",
+      "support": [
+        {"file": "05_opendsa_bst.txt", "contains": "All nodes stored in the left subtree"},
+        {"file": "05_opendsa_bst.txt", "contains": "sorted order from lowest to highest."}
+      ],
+      "rationale": "固定原文给出 BST 顺序性质及中序遍历结果；两条前提都要出现。"
+    },
+    {
+      "id": "bst_worst_case",
+      "split": "holdout",
+      "question": "普通二叉搜索树最坏情况下查找为什么可能是线性时间？",
+      "expected": "supported",
+      "support": [{"file": "05_opendsa_bst.txt", "contains": "operations in the worst case costing \\Theta(n)"}],
+      "rationale": "原文将极不平衡 BST 的树高与线性代价联系起来。"
+    },
+    {
+      "id": "avl_ll_rotation",
+      "split": "holdout",
+      "question": "AVL 树出现 LL 失衡时怎样旋转并更新高度？",
+      "expected": "unsupported",
+      "support": [],
+      "absence_reason": "当前 BST 原文只提到 AVL 树作为平衡技术示例，不含 LL 旋转及高度更新步骤。",
+      "rationale": "资料出现 AVL 名称但不能支持操作步骤，是防止词面误命中的反例。"
+    }
+  ]
+}

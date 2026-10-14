@@ -1,0 +1,36 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+artifacts/
+references/deepreason-full/
+references/deepreason-e98313d/
+handoff/
+.env
+.env.*
+!.env.example
+*.log
+*.sqlite*
+*.db
+
+# Local prototypes and private working notes are not part of the public app.
+/src/
+/tests/
+/run_demo.py
+/run_qwen.py
+/AGENTS.md
+/START_HERE.md
+/CLAUDE_HANDOFF_PROMPT.md
+/docs/STATUS.md
+/docs/NEXT_WORKFLOW.md
+/docs/USER_GOALS_AND_DECISIONS.md
+/docs/CV_DRAFT_CURRENT.md
+/scripts/*
+!/scripts/eval_learning_baseline.py
+!/scripts/import_opendsa.py
+!/scripts/learning_mvp_demo.py
+
+# Upstream authoring instructions and mutable evidence stay local.
+/workbench/deepreason/.opencode/
+/workbench/deepreason/AGENTS.md
+/workbench/deepreason/evidence/ledger.jsonl

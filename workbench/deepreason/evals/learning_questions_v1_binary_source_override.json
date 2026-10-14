@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "purpose": "只在增加二叉树定义资料后，重标原先的资料缺失题；其他 11 题标签保持不变。",
+  "cases": {
+    "binary_tree_definition": {
+      "expected": "supported",
+      "support": [
+        {
+          "file": "07_binary_tree_definition.md",
+          "contains": "二叉树可以为空。非空二叉树由一个根结点和两棵彼此不重叠的子树组成"
+        }
+      ],
+      "absence_reason": null,
+      "rationale": "新增的 OpenDSA 中文提要现在直接覆盖一般二叉树定义。"
+    }
+  }
+}

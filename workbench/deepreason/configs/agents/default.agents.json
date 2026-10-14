@@ -1,0 +1,193 @@
+{
+  "agents": [
+    {
+      "description": "负责简单对话的调度和状态推进。",
+      "handoff_contract": {},
+      "id": "coordinator",
+      "label": "协调器",
+      "memory_access": [
+        "short_term:read"
+      ],
+      "model_role": "planner",
+      "permissions": {},
+      "responsibilities": [
+        "接收用户输入",
+        "启动简单工作流",
+        "输出最终回答"
+      ],
+      "tools": [],
+      "ui": {},
+      "workflow_nodes": [
+        "intake",
+        "respond"
+      ]
+    },
+    {
+      "description": "生成简单的检索‑推理计划。",
+      "handoff_contract": {},
+      "id": "planner",
+      "label": "规划器",
+      "memory_access": [],
+      "model_role": "planner",
+      "permissions": {},
+      "responsibilities": [
+        "生成检索和推理步骤"
+      ],
+      "tools": [],
+      "ui": {},
+      "workflow_nodes": [
+        "plan"
+      ]
+    },
+    {
+      "description": "从本地知识库（RAG）和互联网搜索获取信息。",
+      "handoff_contract": {},
+      "id": "retriever",
+      "label": "检索器",
+      "memory_access": [],
+      "model_role": "worker",
+      "permissions": {},
+      "responsibilities": [
+        "RAG检索",
+        "Web搜索",
+        "证据归一化"
+      ],
+      "tools": [
+        "retrieve_knowledge",
+        "external_search"
+      ],
+      "ui": {},
+      "workflow_nodes": [
+        "retrieve"
+      ]
+    },
+    {
+      "description": "基于检索到的信息生成对话回答。",
+      "handoff_contract": {},
+      "id": "reasoner",
+      "label": "推理器",
+      "memory_access": [],
+      "model_role": "worker",
+      "permissions": {},
+      "responsibilities": [
+        "综合检索结果",
+        "生成回答草案"
+      ],
+      "tools": [],
+      "ui": {},
+      "workflow_nodes": [
+        "reason"
+      ]
+    },
+    {
+      "description": "轻量级审查回答与检索证据的一致性。",
+      "handoff_contract": {},
+      "id": "critic",
+      "label": "审查器",
+      "memory_access": [],
+      "model_role": "critic",
+      "permissions": {},
+      "responsibilities": [
+        "验证回答是否基于检索结果"
+      ],
+      "tools": [],
+      "ui": {},
+      "workflow_nodes": []
+    },
+    {
+      "description": "保留对话短期上下文（此简化版不主动沉淀）。",
+      "handoff_contract": {},
+      "id": "memory",
+      "label": "记忆管理",
+      "memory_access": [
+        "short_term:read"
+      ],
+      "model_role": "worker",
+      "permissions": {},
+      "responsibilities": [
+        "短期上下文整理"
+      ],
+      "tools": [],
+      "ui": {},
+      "workflow_nodes": []
+    },
+    {
+      "description": "复核协调器的路由判断（此简化版为被动保留）。",
+      "handoff_contract": {},
+      "id": "reviewer",
+      "label": "路由复核",
+      "memory_access": [],
+      "model_role": "critic",
+      "permissions": {},
+      "responsibilities": [
+        "复核路由"
+      ],
+      "tools": [],
+      "ui": {},
+      "workflow_nodes": []
+    },
+    {
+      "description": "通过问答帮助用户生成Agent草稿（保留但未激活）。",
+      "handoff_contract": {},
+      "id": "configurator",
+      "label": "配置助手",
+      "memory_access": [],
+      "model_role": "planner",
+      "permissions": {
+        "direct_apply": false
+      },
+      "responsibilities": [
+        "理解用户目标",
+        "生成多 Agent 草稿",
+        "推荐工作流节点",
+        "生成验收测试",
+        "生成Agent草稿"
+      ],
+      "tools": [
+        "agents_draft",
+        "workflow_draft",
+        "config_schema"
+      ],
+      "ui": {},
+      "workflow_nodes": []
+    },
+    {
+      "description": "只负责应用已批准的代码或配置修改（保留但未激活）。",
+      "handoff_contract": {},
+      "id": "code_modifier",
+      "label": "代码修改器",
+      "memory_access": [],
+      "model_role": "worker",
+      "permissions": {
+        "allowed_paths": [
+          "src/",
+          "tests/",
+          "configs/"
+        ],
+        "direct_apply": false
+      },
+      "responsibilities": [
+        "应用已批准提案"
+      ],
+      "tools": [
+        "opencode:code-modifier"
+      ],
+      "ui": {},
+      "workflow_nodes": []
+    }
+  ],
+  "name": "simple-rag-web-agent",
+  "protected_agents": [
+    "coordinator",
+    "planner",
+    "retriever",
+    "reasoner",
+    "critic",
+    "memory",
+    "reviewer",
+    "configurator",
+    "code_modifier"
+  ],
+  "revision": "configurator-draft",
+  "version": "1.0"
+}

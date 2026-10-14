@@ -1,0 +1,861 @@
+{
+  "repository": "https://github.com/redmaplewww/DeepReason-Agents-Framework",
+  "commit": "e98313d661527c3aa6677eec08a3b54b4ab88a33",
+  "recorded_date": "2026-09-25",
+  "tracked_files": 142,
+  "note": "SHA-256 covers local snapshot bytes; git_blob records the upstream object. No Git history in ZIP.",
+  "files": [
+    {
+      "path": ".env.example",
+      "git_blob": "1588ff79fd80eb805130eb86bb2af7e8a84c8a01",
+      "sha256": "540deb348132a31c3004bfca0eaf2c56dc69de195d77ca6d2ad7113c63824eb1",
+      "bytes": 93
+    },
+    {
+      "path": ".gitignore",
+      "git_blob": "4ef97ccd1d94b8b42c9c60e3f7ad901864d0ff4c",
+      "sha256": "d0c8b31cdeda4007e69f2482dc2757b37962c7b2acbf45276b318ce111bafaf1",
+      "bytes": 313
+    },
+    {
+      "path": ".opencode/.gitignore",
+      "git_blob": "25cb250b7cca0aee61c234b826fd0d625f353094",
+      "sha256": "7301cfb9197f5d7ddb75413c8b612155d409b464f39922a94e55a8ede44eca7b",
+      "bytes": 48
+    },
+    {
+      "path": ".opencode/agents/architect.md",
+      "git_blob": "69bdf0b8522fd4ca5f8c199233723dc5ede70108",
+      "sha256": "1ca0e742d12d7ef90dd0e6bbb1404e2da3c23de50001d827b481503ce764bb70",
+      "bytes": 1420
+    },
+    {
+      "path": ".opencode/agents/code-modifier.md",
+      "git_blob": "f50c90dfa52da0f8a3287a5f12e3d5a4f11546dd",
+      "sha256": "5f1338176c6c965525ea4de80c7d049f56443ca56a8e452497f7d0dfbcf30b69",
+      "bytes": 1162
+    },
+    {
+      "path": ".opencode/agents/critic.md",
+      "git_blob": "c8b3749c67b24cb1784af8ee8590a713ee9c6cb4",
+      "sha256": "fe4e95f92ac0631761cbda6787b781553b8cae093adad38c3c8405856e2644e7",
+      "bytes": 969
+    },
+    {
+      "path": ".opencode/agents/researcher.md",
+      "git_blob": "fe4b3e00d45f172aa5df0b00c0eadcc5721422db",
+      "sha256": "5a076091f0134953586e484d625bcfa589e9e983b86cfffa07e8c09945acc52b",
+      "bytes": 955
+    },
+    {
+      "path": ".opencode/bun.lock",
+      "git_blob": "02228e2141193aa349ea211dd0fc5615b9cf3e7a",
+      "sha256": "3f87ba542a387b5b551fa27a2b4948c7f2a6dc8ed28ac72e4b68f93058f49bac",
+      "bytes": 725
+    },
+    {
+      "path": ".opencode/package.json",
+      "git_blob": "4e50c2227a3838574cc882c8f579f70c04b6baea",
+      "sha256": "5fed2392c8d4c921addf9758085ea58992d2f06e98828b4a85940c86be7f94a3",
+      "bytes": 66
+    },
+    {
+      "path": ".opencode/skills/opencode-base/SKILL.md",
+      "git_blob": "4b09ab5321c308c6f3851fe537ec254cf3af2862",
+      "sha256": "815b39435d89b5b8c98a882720c0a474f0224d486c9c22bf8e10f8b50027bfee",
+      "bytes": 1864
+    },
+    {
+      "path": "AGENTS.md",
+      "git_blob": "bdf87b3f30c03b41f9fe02f142ba677f10258b3e",
+      "sha256": "87fd297764c5068e832a596b25008bfc5350c0b0c2ac534720ff248d34508c65",
+      "bytes": 2056
+    },
+    {
+      "path": "README.md",
+      "git_blob": "8e4e04059090ffd257a4489216d48189a4d9ded2",
+      "sha256": "3f7254635c98e16d156b115fe5ac6dbbc4f48b3602f50f75e2b5a4bb4e33a51d",
+      "bytes": 13453
+    },
+    {
+      "path": "agent.yaml",
+      "git_blob": "8ec0033d57f7e38d167060e45416e3884e4e2891",
+      "sha256": "9546509ac59224ed75fcd034f8de1c5d2803b4fb052abba7fc7d7a8d56faaf37",
+      "bytes": 2460
+    },
+    {
+      "path": "configs/agent.schema.json",
+      "git_blob": "df554e43fd7d23cc21ab4a4bc8dd38b2e7272e24",
+      "sha256": "cab30c0ef87b8772836e67c7c57b59b71c759081ceaade8a265e43ca1f2ec0ec",
+      "bytes": 3148
+    },
+    {
+      "path": "configs/agents/default.agents.json",
+      "git_blob": "249573b59579f1036bcf05953df9534feecc198d",
+      "sha256": "8f31235f8faf6faa618a91d9d3c35a491ce7e0a5c94e3fe4e45766f9b1a1d2cd",
+      "bytes": 4813
+    },
+    {
+      "path": "configs/golden-tasks.json",
+      "git_blob": "6c509a8248d26a2dd3c92c479f96fcbd1a26259a",
+      "sha256": "beb75ea582dcf73c18f3b02eb03c4ad93b64fa12f865f86c1976c472cc131a91",
+      "bytes": 478
+    },
+    {
+      "path": "configs/rag_benchmark_cases.json",
+      "git_blob": "f92bf56a000a21570007147817080f9732c7fad7",
+      "sha256": "8bad91112e49e579b45e0d26449364f062d0079a82cee00fd5f5ab6f4db84f1d",
+      "bytes": 4914
+    },
+    {
+      "path": "configs/templates/builtin/autoresearch-agent.template.json",
+      "git_blob": "3ab2d12899cbc79c8658271d31300e3e7cdd363d",
+      "sha256": "b7c2a1f7290e4228a9f8ac670ffd4d3436efd5c0835e1fc8b1ebcedeeacbbfca",
+      "bytes": 31298
+    },
+    {
+      "path": "configs/workflows/default.workflow.json",
+      "git_blob": "77435d57baa697f585c07164a8b90d743de7fa84",
+      "sha256": "dfaf426cf61d36526baaec473c100486faff4b6eebb87f17d1e0ae8c41849738",
+      "bytes": 9187
+    },
+    {
+      "path": "docs/README.md",
+      "git_blob": "66a2b226c12e0ceb122b1f9a3ec3a27a33db4d51",
+      "sha256": "a63a3421d81566650c5a6e3dfcae7a7969bb0ee27504d1c24eea8b79dd7bb47f",
+      "bytes": 1426
+    },
+    {
+      "path": "docs/agentops-hardening.md",
+      "git_blob": "6a55c156b413c6352e2f293942564e25c0355d74",
+      "sha256": "bf92ee40309935b185b3ae33901d439d57f8826affccf557a2188e355f788b00",
+      "bytes": 2463
+    },
+    {
+      "path": "docs/architecture.md",
+      "git_blob": "58d6f0a68a66c57d7fea6cf39d2f80002ca9affd",
+      "sha256": "c208f64806dc09f4156619680cc1305e949a60624a5db7b664a335b3bb41d86f",
+      "bytes": 1710
+    },
+    {
+      "path": "docs/assets/deepreason-console-overview.png",
+      "git_blob": "d0d72b252c66f4b91fb327cb627c2b2c7c80649c",
+      "sha256": "0235ecbf3602ae9cc857a3a684f74e463395a4e91b8fba08d4876802615a771c",
+      "bytes": 170926
+    },
+    {
+      "path": "docs/assets/deepreason-rag-lab.png",
+      "git_blob": "234106acd3e1dcea83d063394b2b1f8ec923194b",
+      "sha256": "b893a81e2d685d8770fcd1b8bfbd19cd5024335ab7a4467d3bebae02ad676ebc",
+      "bytes": 210591
+    },
+    {
+      "path": "docs/assets/deepreason-workflow-detail.png",
+      "git_blob": "edd292f886fd556d1f7c987f4f9c85839099ad18",
+      "sha256": "6d92e0978af4dc72c0e59a4657c8ab041ec00c890d026b499b58fe59be8eea2c",
+      "bytes": 187846
+    },
+    {
+      "path": "docs/assets/usage-cards/01-entry-map.png",
+      "git_blob": "8eb4a59d6c623ebe1927eec8cb76f58275fb9fc3",
+      "sha256": "b21b1a408a3eb056735ac4f51a2bb8b498d3df6e1f0f83f783931282501f283f",
+      "bytes": 47119
+    },
+    {
+      "path": "docs/assets/usage-cards/02-task-routing.png",
+      "git_blob": "309d3b934ad28756366929c4219b378b5b741aa0",
+      "sha256": "136dc28ec21d40df9ab978a1d81f3124317b558d0b020e4cee96344b19032dff",
+      "bytes": 69462
+    },
+    {
+      "path": "docs/assets/usage-cards/03-default-workflow.png",
+      "git_blob": "1fdad261ff6494ae513cf5aef0148ed82612dcf6",
+      "sha256": "da2463583f35899a437b7e06f1ed3792881f07a843855b99a8f838abd8cf4f87",
+      "bytes": 51206
+    },
+    {
+      "path": "docs/assets/usage-cards/04-structured-handoff.png",
+      "git_blob": "065212c24273758401b99c9a1894ea21daf3b130",
+      "sha256": "d88612ece722a368e5ebfca409591b812deaa852831a083b657e1cb06e7ba975",
+      "bytes": 66941
+    },
+    {
+      "path": "docs/assets/usage-cards/05-rag-evidence.png",
+      "git_blob": "c14aab7674e4eda3b23fbaf7774992ef2359cdc9",
+      "sha256": "5cbd2999ff1b814a768bc00ed335809378e394af42bf88b48a721121bb289ab7",
+      "bytes": 62619
+    },
+    {
+      "path": "docs/assets/usage-cards/06-memory-boundaries.png",
+      "git_blob": "0868e56efb6859aa91f70ad47f7ae7932f88c523",
+      "sha256": "a5546c9c16450e8303fd258d5525a48779f0458f897e639d324aab4ca21edd20",
+      "bytes": 59599
+    },
+    {
+      "path": "docs/assets/usage-cards/07-editor-proposal.png",
+      "git_blob": "4291f42dfef9f99816580018e65c5c9f9ba1238d",
+      "sha256": "1f455d3a2252937f87925c0e8b2439d366961b4ca931c9e1abf31f4e92f53619",
+      "bytes": 64848
+    },
+    {
+      "path": "docs/assets/usage-cards/08-developer-loop.png",
+      "git_blob": "9992e3f46f27c3cb3637cf96aaf8b4713f35fd0c",
+      "sha256": "f3ee6207da0de756ffed03720c4003cc9d91b973cc0d29c803b99bbc0a1ef73a",
+      "bytes": 72843
+    },
+    {
+      "path": "docs/assets/usage-cards/source.html",
+      "git_blob": "7d1c5b38cab0a45e910661471675284e4a801d47",
+      "sha256": "437779b7b1696038db55d8e31010da7efc8451616f41009b9c66b511e860cc85",
+      "bytes": 27572
+    },
+    {
+      "path": "docs/open-source-ai-architecture-recommendations.md",
+      "git_blob": "f18c82d4b02ab31632b2d42a5032ae977aeaf850",
+      "sha256": "eee59ce07580fdbc933914e9afc2bdafe3f598058f8ac513112dae22d4b5e63c",
+      "bytes": 19192
+    },
+    {
+      "path": "docs/openclaude-distillation.md",
+      "git_blob": "5332d03d380c3fe784a6d8942f6a2d964f0bd491",
+      "sha256": "972a2b12236cf147fd1c831aa6777214d7b0ae955eb8eedd95525bd06d6c7a94",
+      "bytes": 14729
+    },
+    {
+      "path": "docs/opencode-base-architecture.md",
+      "git_blob": "06db2e6ed0d88aa633bd89765af4fbc52d867a48",
+      "sha256": "5beffa32ea8dc85e08728d05b1db9736d89267a30702507428f53a28eea5ffd1",
+      "bytes": 3308
+    },
+    {
+      "path": "docs/opencode-operating-guide.md",
+      "git_blob": "eb29139ebde6c51df3ce1daf15235f85865447b6",
+      "sha256": "351b5918b3ef46297253a72579b4bc464ec37e676e785ff2cf0537d9e3f5f8e4",
+      "bytes": 2376
+    },
+    {
+      "path": "docs/quickstart.md",
+      "git_blob": "1484ebcfa1a7cff50ae5b2cd638fce7b26a7c331",
+      "sha256": "4e64e143a88f41f8508cd8da5a069ef74063431f992cdc3f463e0d850d190f34",
+      "bytes": 1910
+    },
+    {
+      "path": "docs/rag-benchmark-latest.md",
+      "git_blob": "5a9ef8246f8dbc12a346355205e98c28a3287751",
+      "sha256": "a07ded7153f6222433e287543790407a614756f5b158ff20854148c2bd37513a",
+      "bytes": 1214
+    },
+    {
+      "path": "docs/rag-indexing-guide.md",
+      "git_blob": "63a9427ff92d5710c1486a590623ad1b0e17e889",
+      "sha256": "cb67d6f13e875e8e8cf8066e7a16f11407d3fbdb1b008de3b426cee69394d155",
+      "bytes": 3546
+    },
+    {
+      "path": "docs/rag-recall-eval.md",
+      "git_blob": "d89e2dfc74d01f055e3c17c461bc28828c4742e8",
+      "sha256": "9c55f874acd74ddd3229cb184bb51c5a2dce3cc0126933eab10ce9344a7a29df",
+      "bytes": 3419
+    },
+    {
+      "path": "docs/reviewing-evolution-proposals.md",
+      "git_blob": "db7bd2cd1d38e8bdbaef5e5259689f59ed1951a9",
+      "sha256": "85dc25f6d3bee7efddbafdd764b12b9eda54e56c30e87d22ae7267c1d00895f1",
+      "bytes": 432
+    },
+    {
+      "path": "docs/usage-cards.md",
+      "git_blob": "b9856c869f7f5dd1d1f6cb2288632265efd63a13",
+      "sha256": "f4bf90c447e35b2d9f0cfdf2e32b9c42dad75445980500a731a8fe3ff5b5012c",
+      "bytes": 2001
+    },
+    {
+      "path": "docs/usage-guide.md",
+      "git_blob": "f728169402fcb16e2e8ee1dfa6823a6c1fc5ab33",
+      "sha256": "eb319db5e2a7e0aeb4d6643e65f8d6d38b87d436a8f8c845443248828efe67b6",
+      "bytes": 9161
+    },
+    {
+      "path": "docs/user-manual.md",
+      "git_blob": "d07b8ab7830222ec446f2740667531c634e81f4e",
+      "sha256": "083e2aa8e445a60503161d7236f748d32c1755988903b5aa728d737088b1a4ad",
+      "bytes": 29710
+    },
+    {
+      "path": "docs/workflow-editor-test-report.md",
+      "git_blob": "5dcc3ac424f133b4c3883f006c5f1e3e6fb34702",
+      "sha256": "ca689fed4f06c19e127dee0012f87bbc209be525b30b25b769b22aaede2b2f84",
+      "bytes": 1290
+    },
+    {
+      "path": "docs/workflow-editor-usage.md",
+      "git_blob": "426cfacfb317badce6386af9aef4066a2455d7e7",
+      "sha256": "6f41c9861cb397b5025ebf06807cde71017be6f9f43ca1aac7cefad8484e3651",
+      "bytes": 3897
+    },
+    {
+      "path": "evidence/.gitkeep",
+      "git_blob": "8b137891791fe96927ad78e64b0aad7bded08bdc",
+      "sha256": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6",
+      "bytes": 2
+    },
+    {
+      "path": "evidence/ledger.jsonl",
+      "git_blob": "52cd4b58d848b0000ebb74e4160ac38f921a6e48",
+      "sha256": "e7e759da31383fa9effa8187764969ad9667103c9856558e8ddd27f4ad321c82",
+      "bytes": 38420
+    },
+    {
+      "path": "evolution/proposals/.gitkeep",
+      "git_blob": "8b137891791fe96927ad78e64b0aad7bded08bdc",
+      "sha256": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6",
+      "bytes": 2
+    },
+    {
+      "path": "knowledge/memory-policy.md",
+      "git_blob": "69dd781c06b38f38b2ac3689287a5ee7408dd5fd",
+      "sha256": "0a4ef179d3ed91b319332ee47583f14059e94591ec9497f554142d041d3a8201",
+      "bytes": 264
+    },
+    {
+      "path": "knowledge/rag_benchmark/01_index_bootstrap.md",
+      "git_blob": "3ec60d9693b278ef52ad9dd902e0cdcee442d09f",
+      "sha256": "d82d298fe45370ef5d8cc960e9061fbdae3e3f045e051fabd64132d941b20aad",
+      "bytes": 736
+    },
+    {
+      "path": "knowledge/rag_benchmark/02_graph_relationships.md",
+      "git_blob": "080bda37d8a14a6a86d53193830cec59e4674b34",
+      "sha256": "f43d14d9ba0ff98c8a3d6c66d6f88d7dd3e151af1a801bbfc746a75ccf7c899b",
+      "bytes": 792
+    },
+    {
+      "path": "knowledge/rag_benchmark/03_wiki_fallback_policy.md",
+      "git_blob": "6588142d897723a453d4eacbd4d85f9a1a17bdac",
+      "sha256": "43b3307c2cd97335926d40a2799dc705993e8ca41e4d98c5ee68e37ab3a1ee2b",
+      "bytes": 790
+    },
+    {
+      "path": "knowledge/rag_benchmark/04_memory_knowledge_boundary.md",
+      "git_blob": "235e4ecf73412f8c547da7255e4cd4947a74fefe",
+      "sha256": "d2e195c34ebc4c1be52bb23dac415b901d0f4d9c828329eac18819beef84b6f0",
+      "bytes": 782
+    },
+    {
+      "path": "knowledge/rag_benchmark/05_high_entropy_precipitation.md",
+      "git_blob": "d538e67ba78f65dc4921298f95dc830d8104f3a5",
+      "sha256": "294fdd4bcc202741d2ef1b85f4e10eba1b27d7058b6f492992f812b7416ad364",
+      "bytes": 662
+    },
+    {
+      "path": "knowledge/rag_benchmark/06_battery_sei_degradation.md",
+      "git_blob": "6cac71b71d53e1d8b2def69cd7e4fd8bc95ffc19",
+      "sha256": "1c2bf590754dd344dc90b3761767a11f5918c277fef5167124c08b3baeca0dd5",
+      "bytes": 551
+    },
+    {
+      "path": "knowledge/rag_benchmark/07_workflow_handoff_contract.md",
+      "git_blob": "b46ca1d0f7b40bfe2d7770b917f2801dec856823",
+      "sha256": "e957ec9c5e4886f7b9121d30135f7f676ff18e7c7efabfc3a9330648bc5b923e",
+      "bytes": 764
+    },
+    {
+      "path": "knowledge/rag_benchmark/08_cross_encoder_reranking.md",
+      "git_blob": "441f3f34bd2bc3afd7f8b19befa5f739cd061a95",
+      "sha256": "01a6fb9de69e2949a979c8a0f087439f2d29a1f8844a3f624e61dd03b2aafad9",
+      "bytes": 688
+    },
+    {
+      "path": "knowledge/rag_benchmark/09_user_experience_evidence.md",
+      "git_blob": "3d4cf5c6099eb9c9bfbacf52876a98307fa6e14f",
+      "sha256": "261a18d37b18b91e2eea91202c2c0697b5c2e489f6e22346982bf9c65028abc6",
+      "bytes": 590
+    },
+    {
+      "path": "knowledge/rag_benchmark/10_secret_rotation_security.md",
+      "git_blob": "6573ac6919867cd0ff8f4da55de992976c0df519",
+      "sha256": "7244fc102f4cc19d7b1b3137703e3a823885b07daccddfed69199e4ab0e16f77",
+      "bytes": 559
+    },
+    {
+      "path": "knowledge/rag_benchmark/11_multilingual_mapping.md",
+      "git_blob": "3f79a76db82fbec6561895f6f90c26188382a06c",
+      "sha256": "e0a03f4eef8cce0fe158abef9492e716f48fee5a113a6fcc5da11b8dd8da1568",
+      "bytes": 960
+    },
+    {
+      "path": "knowledge/rag_benchmark/12_recall_metrics.md",
+      "git_blob": "0d11ea9940c330da59d7a8b5412d115196a228b8",
+      "sha256": "a2f94ae6b58b9f9f3194f0c2cd7cf310b82e3e3a5dd9937ffa2e135578a89798",
+      "bytes": 965
+    },
+    {
+      "path": "knowledge/rag_eval_test/01_vector_hnsw.md",
+      "git_blob": "ee0ca8629f4ff33e4398da2a3801317cc839258f",
+      "sha256": "b5ca4512ca788e7cd3e001ca1274b756c81ef11b4e0ef9c9522d6e0b8926c5ef",
+      "bytes": 348
+    },
+    {
+      "path": "knowledge/rag_eval_test/02_bm25_keyword.md",
+      "git_blob": "277a59db200f426ffa1166dd0d37ad26b2d42184",
+      "sha256": "a47f71a4c68a7f51af55fc6a1721cf700045fb733f63753bfb0d3d50b78be9d0",
+      "bytes": 332
+    },
+    {
+      "path": "knowledge/rag_eval_test/03_graph_rag.md",
+      "git_blob": "3d76cfc06007419b5162907678654cbca5f00883",
+      "sha256": "98835c3f35ff68bc583c9d080da7da4add410d4c6c6f887c0b1deb3858c4bb0f",
+      "bytes": 308
+    },
+    {
+      "path": "knowledge/rag_eval_test/04_cross_encoder_reranker.md",
+      "git_blob": "33f7f90cc5d226d14f26a9d2780c859f3d0e01ae",
+      "sha256": "ff9b4a62e31d97a48d58c1bed42dd51b81737bc0a04f953af22bccac7ec07dac",
+      "bytes": 333
+    },
+    {
+      "path": "knowledge/rag_eval_test/05_chunking_overlap.md",
+      "git_blob": "5653eb40a80cc5c693e0372b0fd6af3f821b5c79",
+      "sha256": "01bda0cab7d9a7d8b2f49c1126156219b706fda9442fdfebf01f868523b31a18",
+      "bytes": 297
+    },
+    {
+      "path": "knowledge/rag_eval_test/06_high_entropy_alloy_strength.md",
+      "git_blob": "a9d96750d4bfbd05621cf3aa909e5fd6ab39c3fd",
+      "sha256": "213f52770903e6c1e2e2de19cb2b971a0f0ec00612fec67d67e7a37e040327b4",
+      "bytes": 389
+    },
+    {
+      "path": "knowledge/rag_eval_test/07_memory_gate_policy.md",
+      "git_blob": "45381b932029ee6f963d4055db7a8320c2eec351",
+      "sha256": "ba8401dcdce40d3b8adbb286079181ead2dcf02a4bd3a7de129758afd420a67f",
+      "bytes": 329
+    },
+    {
+      "path": "knowledge/rag_eval_test/08_self_evolution_proposal.md",
+      "git_blob": "a8698ad8eec1e666047656dd7384d4bfd833a04d",
+      "sha256": "299b53ab2f2397900761b9873d85c75e62234fa38c95ae8752f7b2e77f1f2343",
+      "bytes": 309
+    },
+    {
+      "path": "knowledge/rag_eval_test/09_state_machine_workflow.md",
+      "git_blob": "d7d462b0f87c17d0945c3768b3fe3847db089530",
+      "sha256": "759a84fe61adf65c38f80b2f1cd55996ddb4e3f356e1986385a360c19fc24e89",
+      "bytes": 331
+    },
+    {
+      "path": "knowledge/rag_eval_test/10_secret_rotation.md",
+      "git_blob": "bb660be8ad3575dc8df9595c85abcecacb52f3f7",
+      "sha256": "93485d9d179db6452240f3b3208f0db801334e22b373871318df6d1bc4d8e209",
+      "bytes": 327
+    },
+    {
+      "path": "knowledge/state-machine.md",
+      "git_blob": "83e5e4544847dfd5357b4273d782f90f4864041e",
+      "sha256": "a9b77ef0420c52553f21efff36d9b7f7219d08c13989d07f4d28525862dbfbd2",
+      "bytes": 539
+    },
+    {
+      "path": "knowledge/template-principles.md",
+      "git_blob": "99e1adb27cd8d7d405e82996b2f789f2f5a49f63",
+      "sha256": "ef3da747089d24e527865281de12044b2938b953f237b9934f1c1d9aef65d1c4",
+      "bytes": 576
+    },
+    {
+      "path": "memory/.gitkeep",
+      "git_blob": "8b137891791fe96927ad78e64b0aad7bded08bdc",
+      "sha256": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6",
+      "bytes": 2
+    },
+    {
+      "path": "opencode.json",
+      "git_blob": "c392e056d56f589fce5f814f64698f23fd6da3ba",
+      "sha256": "a80327ea7ef08c535397ad7eec694682eea1b3e67f5686e1ebf44f7097d67348",
+      "bytes": 2614
+    },
+    {
+      "path": "pyproject.toml",
+      "git_blob": "98ff06af17fc977134f11d2f012588824c4f7d16",
+      "sha256": "f8862813d1a21f7f2e3f9176605edcb159b716b71f81155588d1a7cb240c5375",
+      "bytes": 811
+    },
+    {
+      "path": "scripts/deepseek_smoke.py",
+      "git_blob": "9a512ebc72cd6cf71f03d68ad74faf1055b3bcf4",
+      "sha256": "9fe66970395c00a0fb8992892c242c1c87c1308d0baad79c2023cc5b7c30201b",
+      "bytes": 1337
+    },
+    {
+      "path": "skills/configurator/SKILL.md",
+      "git_blob": "4480e502bdd60a970fe89fc75dd85d08e0d084a9",
+      "sha256": "e5fd7db971f78aaa5d793c42f484d86f5ed1a2847526dd659958fbb7066562ae",
+      "bytes": 1263
+    },
+    {
+      "path": "skills/configurator/agents/openai.yaml",
+      "git_blob": "874040c6482f911dace135c4a586154a687d0f6d",
+      "sha256": "2840e9fc381a419bfa195d9b8ac14d258490808f2a72503437d84861acacccb1",
+      "bytes": 186
+    },
+    {
+      "path": "skills/evidence-first/SKILL.md",
+      "git_blob": "fb15c7310a0b1363f7794b3c86b2c1935d7794aa",
+      "sha256": "b3a0fd6d50e24daee0dd4e28fe33c4ceb1df5dadf5f1d9a69e53566b33beb714",
+      "bytes": 1428
+    },
+    {
+      "path": "skills/evidence-first/agents/openai.yaml",
+      "git_blob": "e8b06271e7b4de63e71b5c7f54605bdbf82604e0",
+      "sha256": "33ba54926935fc9118371c8cb66549f58bf1b17b3af75169daf7ef94cd6d5e50",
+      "bytes": 182
+    },
+    {
+      "path": "skills/knowledge-rag/SKILL.md",
+      "git_blob": "f0666740b8a85291e2423ad68336d4762053117d",
+      "sha256": "024b8d4f9300e325e08edad10ca8f3108dd9d3f725be9b69734b7cb176ec9a68",
+      "bytes": 990
+    },
+    {
+      "path": "skills/knowledge-rag/agents/openai.yaml",
+      "git_blob": "6e33ee55881b9cd634d623c8632547ba16a99ba0",
+      "sha256": "133ff1b99a592f4ace0c51a6bb2adc4b3811d4b6999f0d9cc60550bbc0cdb399",
+      "bytes": 188
+    },
+    {
+      "path": "skills/memory-consolidation/SKILL.md",
+      "git_blob": "ebb851f53d9fd36236168e7a536affbe27ffe7c6",
+      "sha256": "02783859daad72eff558285f4e91919659b109685030e035fa4e26b2f30b0062",
+      "bytes": 1138
+    },
+    {
+      "path": "skills/memory-consolidation/agents/openai.yaml",
+      "git_blob": "3134799948a837ab587bd5ee1a86165b2bc80ea6",
+      "sha256": "e01845d9ce18ec0cebfabe86d8602d006d1ea8a135d9b50ea2dd0e905919a6c8",
+      "bytes": 196
+    },
+    {
+      "path": "skills/minimal-change/SKILL.md",
+      "git_blob": "cd88e2a81c05a47677777f368dacd48a1667c564",
+      "sha256": "9b9101a19008556ae0e29c6442f505a233a7febdef818038afd10cac24a26c66",
+      "bytes": 1170
+    },
+    {
+      "path": "skills/minimal-change/agents/openai.yaml",
+      "git_blob": "f14b4976fa55fed41130d38ceef937beb01e3726",
+      "sha256": "371cb7de52a59d318cfa7b8d649a58e89ae63d2071511bea79ef81d209b546ac",
+      "bytes": 189
+    },
+    {
+      "path": "skills/project-intake/SKILL.md",
+      "git_blob": "7914dc9ff57c6ffd33e9ca3f9c1f33ca22663c29",
+      "sha256": "3718e0fbd05b84ebf0e14c5ebf376e62057dcc9a0b18d0073344d3e8139059ef",
+      "bytes": 1644
+    },
+    {
+      "path": "skills/project-intake/agents/openai.yaml",
+      "git_blob": "a86e895d68cd02a04b86b2e212bdae9425871fd8",
+      "sha256": "c9644ee93b7d0ecf1a6c9edc5d55c1e42c57e330fc9c385010ab0c9529f79435",
+      "bytes": 195
+    },
+    {
+      "path": "skills/self-evolution/SKILL.md",
+      "git_blob": "c65297f1e295f7de7b7c73ba759ac494749fd82b",
+      "sha256": "8eeddb4a8af73767a1099c47b16f2594cea2a0b3828497e065ebfe5e4d769531",
+      "bytes": 1060
+    },
+    {
+      "path": "skills/self-evolution/agents/openai.yaml",
+      "git_blob": "efa9798dd6f75b8901f62b5e63f76c421c4b5131",
+      "sha256": "59f5f3b484432d304a319ace90d42b28e1494be8d91cbd439522d5f381996eb8",
+      "bytes": 193
+    },
+    {
+      "path": "skills/state-gates/SKILL.md",
+      "git_blob": "fc713630587fcccf14761c9fd9c4c436cbf495d4",
+      "sha256": "caba25d3777c6dfe3b1c676af4ace0a4a16267550347613f6b7da75ceb55d0db",
+      "bytes": 1294
+    },
+    {
+      "path": "skills/state-gates/agents/openai.yaml",
+      "git_blob": "ca14de897f025448935cdf91b495130285371fa6",
+      "sha256": "d4d2545a3222adc7dbad42a617d47dbbb8513c359f24a55135bf9a2bf638fda8",
+      "bytes": 190
+    },
+    {
+      "path": "skills/testing-verification/SKILL.md",
+      "git_blob": "c61719e42155b4ed54b8a124d3a10f9884ec8ac3",
+      "sha256": "2a3da6231b2b2d2640d3888e2b0f187a2fe6b35c469716c39db7afc88774483e",
+      "bytes": 1251
+    },
+    {
+      "path": "skills/testing-verification/agents/openai.yaml",
+      "git_blob": "34d73fe734e1c1fc625f9be757ee0e1eab8f35fb",
+      "sha256": "8e8a7ec8cc68a9ec740dab2d46ba28c768526a737f2d917a002137ace5987ab5",
+      "bytes": 209
+    },
+    {
+      "path": "src/reasoning_agent_template/__init__.py",
+      "git_blob": "969bb1750ac41c6a32c660601e9856fb85798360",
+      "sha256": "ae551a3047cf9a0cd1a70ee0b5f13bf8b5c3286bc47cc09b4a2b2fcba9cc5f44",
+      "bytes": 768
+    },
+    {
+      "path": "src/reasoning_agent_template/__main__.py",
+      "git_blob": "e7c8f90782178afc81f430d8abb7cb87edac211b",
+      "sha256": "9763d234ea3deb2d06cc5cda1b4cea211aafed5c976bd647f632d5ac12135ce2",
+      "bytes": 77
+    },
+    {
+      "path": "src/reasoning_agent_template/agent_templates.py",
+      "git_blob": "0ced636cbc543f256587b02042c7605bc36418b1",
+      "sha256": "aa4feeb7ecc97a0f3eec1f1a4779a2f629ba62d098e1416341f39b3ad2a6b4b5",
+      "bytes": 8208
+    },
+    {
+      "path": "src/reasoning_agent_template/agents_spec.py",
+      "git_blob": "06e9e6fec4191acd36dcf04fa9bdbfaf7040b64e",
+      "sha256": "91d52917c98b70746ac80a33cf1d1858e383603d32beed9e2b601f44adb7928d",
+      "bytes": 15479
+    },
+    {
+      "path": "src/reasoning_agent_template/cli.py",
+      "git_blob": "53f4486f8898ed42cb8ee524ddf2520252c2f20d",
+      "sha256": "2494a6515e2ad10672bf4f0bb7c4faa03771f6bfa85dc9894aa9fb6292295d3e",
+      "bytes": 8898
+    },
+    {
+      "path": "src/reasoning_agent_template/code_modifier.py",
+      "git_blob": "243e882349baf8eec6f928c6096ef21a7906b8f4",
+      "sha256": "758b0e8e28af971923a3090cf847e62e6aaa0f8997fe24b868830a9f55f6f282",
+      "bytes": 10731
+    },
+    {
+      "path": "src/reasoning_agent_template/config.py",
+      "git_blob": "338156049b6ac384d464a61b85a10d29096fbbd7",
+      "sha256": "ff3dc960da0585faca49a43922dd2d616d2d56b326e0725fe6f7e098157630a4",
+      "bytes": 7692
+    },
+    {
+      "path": "src/reasoning_agent_template/configurator.py",
+      "git_blob": "f4dedfcc0d90f2f238e61ba95d0eba1848fab9e2",
+      "sha256": "4c998f472d95f773833c5e527962580948f1ce9b2284e72f765b4d773705e57f",
+      "bytes": 4160
+    },
+    {
+      "path": "src/reasoning_agent_template/evidence.py",
+      "git_blob": "558d0fbf4e7bb4c17682ae559ac6e75ac55cd368",
+      "sha256": "5e3decb99be294c377d13a135724632d2c7742c486bce68d51807ec61d4cc649",
+      "bytes": 3513
+    },
+    {
+      "path": "src/reasoning_agent_template/evolution.py",
+      "git_blob": "b2684316a81de6f3999f128017489f40b438fb7d",
+      "sha256": "24024ad01208647055d83a636367025e9d3ac76a1963c2f5c0031ada3c1c2162",
+      "bytes": 1909
+    },
+    {
+      "path": "src/reasoning_agent_template/external_evidence.py",
+      "git_blob": "2e9b001ee4d94084c17ca284dc9d30b7fb22de4b",
+      "sha256": "7d490246a25755d2cbaefc1f9bcfdfb4b6912fb6c6b318fa60d4af62cef87ab6",
+      "bytes": 23809
+    },
+    {
+      "path": "src/reasoning_agent_template/gates.py",
+      "git_blob": "d077c5a0edb7bc6eecc40e4f9548941c2743d66c",
+      "sha256": "294c7256fc9e11ffde2426db9f57a58c650ee916abfad5ca501035ff1128a80c",
+      "bytes": 2704
+    },
+    {
+      "path": "src/reasoning_agent_template/knowledge.py",
+      "git_blob": "529bbcac9e20592ea617bffe8039b1880ee21302",
+      "sha256": "1bb627c1de6b28dd6511450c1c88e32fb7367186a395b77f9ab4aa285d14823b",
+      "bytes": 21354
+    },
+    {
+      "path": "src/reasoning_agent_template/llm.py",
+      "git_blob": "4c73de6dcb4f527e33ea9a54209bf9d8ae6fed0b",
+      "sha256": "4e8c8f9d4badb0979176f40cc9fde082d92a0ab11fab6155704d3d00f947cad7",
+      "bytes": 5291
+    },
+    {
+      "path": "src/reasoning_agent_template/memory.py",
+      "git_blob": "4b3e3569d6fb0b74c4c573d9c72662a926da654d",
+      "sha256": "a47dc11ca1f94e7363df4a77a865143bb0196c930785da2a6edb0ad25680c2e5",
+      "bytes": 7889
+    },
+    {
+      "path": "src/reasoning_agent_template/models.py",
+      "git_blob": "6d57827da47dd0cfd37fb418a2095b0906946b9a",
+      "sha256": "961c24756c399796e9969ef0a72019dacba83a862ce6ecd48b7eec139d419708",
+      "bytes": 4971
+    },
+    {
+      "path": "src/reasoning_agent_template/multiagent.py",
+      "git_blob": "8f5a6a6eb184ba6a168249e96976aec25c67a143",
+      "sha256": "99737b31f7d987290acfa8c6b532582441019d80248c180b52229df1e9c0661f",
+      "bytes": 92813
+    },
+    {
+      "path": "src/reasoning_agent_template/plugins.py",
+      "git_blob": "ad9c17eb4441de406d0cf2c538dd11918631fca0",
+      "sha256": "06cf6f32aa7088dc5d24f5ec8698c596f4ee239495e20ab0a82a46364d18f2d7",
+      "bytes": 13593
+    },
+    {
+      "path": "src/reasoning_agent_template/rag_eval.py",
+      "git_blob": "948d93382106afdce9bc93539d16aac5fcec71e4",
+      "sha256": "512b2a567ad1e282b817481ae1f9d6388e330e9e280cf9a279cbc54be2939761",
+      "bytes": 7335
+    },
+    {
+      "path": "src/reasoning_agent_template/risk.py",
+      "git_blob": "97de93100e2295df958eb1970f68093b53144655",
+      "sha256": "6f3a8cbedff7571d103a1336ab230a19e8f95f1e56d655aa77c56cd0245ce51a",
+      "bytes": 10981
+    },
+    {
+      "path": "src/reasoning_agent_template/runtime.py",
+      "git_blob": "ba4498515ab7017784f9e169e8d5d439ad83c4ba",
+      "sha256": "951cc421cdf965fd14a44850874fe342c19c3398a65eb6ea57ccc3fef9b3d31b",
+      "bytes": 18146
+    },
+    {
+      "path": "src/reasoning_agent_template/sessions.py",
+      "git_blob": "af319be99298e3dba99089fc659170003205c0e3",
+      "sha256": "9cae238671a290672b19904478e6cab494b40dbbef25cdb3cf2b1d8700cc9ce2",
+      "bytes": 5131
+    },
+    {
+      "path": "src/reasoning_agent_template/skills.py",
+      "git_blob": "77963922aa53943f1b0058d15c98d188cfdfa138",
+      "sha256": "d69cc0c86423fb9895a8969845b18cb0206ebad507b28b989547ef5906fdc0ff",
+      "bytes": 1279
+    },
+    {
+      "path": "src/reasoning_agent_template/web.py",
+      "git_blob": "4c646909cae6c8c9ab3ed840552cb2229c8f4828",
+      "sha256": "fcf9712f7d0e4f84833cda85dc8f69aa2dceb6a04bb9b4831b26b9758b5a8639",
+      "bytes": 66887
+    },
+    {
+      "path": "src/reasoning_agent_template/web_static/app.css",
+      "git_blob": "e5189d611740eb381e56649c1af1bac4a5013134",
+      "sha256": "aa6b4d13549b1c5839fdedb61260a2ca31a01fa26b44f9c9a34237bae2cd8832",
+      "bytes": 23867
+    },
+    {
+      "path": "src/reasoning_agent_template/web_static/app.js",
+      "git_blob": "ab459789ad96cc2b102acbd226d778e14f653769",
+      "sha256": "5e04da89adc39b52fe382192ce863ac97655f0b2067cffe27e76f85bc5c19bcf",
+      "bytes": 101574
+    },
+    {
+      "path": "src/reasoning_agent_template/web_static/index.html",
+      "git_blob": "efa21d96fc8473402cf27f0be4612b9dfef0f701",
+      "sha256": "c28a62e5b99d0c72ced167c3d12692a9da206b8c0aaf70c96da7b7c8a8597cb8",
+      "bytes": 5211
+    },
+    {
+      "path": "src/reasoning_agent_template/web_static/vendor/cytoscape.min.js",
+      "git_blob": "be225eadd48edf7c73acb85355af12bfc929556e",
+      "sha256": "1ebb49a336b1d6d30fb4488bdbaaa42a41a6ba4e0dce93531327290e20dc0bd4",
+      "bytes": 435359
+    },
+    {
+      "path": "src/reasoning_agent_template/workflow.py",
+      "git_blob": "311add181443e42dd9882a69bdf597559b3fc99a",
+      "sha256": "0116dc8f6ca27418eae8a56ebe0fb6f20b24c86ca6247cff0e2216c9c429acf5",
+      "bytes": 37237
+    },
+    {
+      "path": "src/reasoning_agent_template/workflow_spec.py",
+      "git_blob": "58b158124d153a976ea6d46e0ba87530f448bec3",
+      "sha256": "1f10d0cb4d7cc57a7ecfc53a0ee230d0f994f34382654f4cac25b055518e7636",
+      "bytes": 23541
+    },
+    {
+      "path": "tests/__init__.py",
+      "git_blob": "7c4b1ba7342fc00eaa50b1f2e97c7405af04261d",
+      "sha256": "65edee1bcca30e5a3366081a34101fc40269babbc936fbab11ae665a8ceb0691",
+      "bytes": 298
+    },
+    {
+      "path": "tests/test_00_bootstrap.py",
+      "git_blob": "70f4bbf315ab87e8d5b5582beef472d90d718367",
+      "sha256": "ac5f7bfbea2495a54991cd6b670af42f7280137027200793346c92eb2c014687",
+      "bytes": 384
+    },
+    {
+      "path": "tests/test_agent_runtime.py",
+      "git_blob": "4979ac6efdc0dc5417c9a7c3b8fd9db28176fc84",
+      "sha256": "a1dc12eb8a36067b894a8b1c2b0c634f69d1ef3cf35eee2c8a2556661622982c",
+      "bytes": 10548
+    },
+    {
+      "path": "tests/test_cli.py",
+      "git_blob": "d585b502a2497dfb46e4d3858378126696ba8f99",
+      "sha256": "d50e3df67e51d59e7ca1a65323c828ef502434e75662bdb00d0ae9003f1f055f",
+      "bytes": 6653
+    },
+    {
+      "path": "tests/test_config_skills_configurator.py",
+      "git_blob": "9c4d6d3d6ca423cf1fd05d06e0f9c609e2ecf01e",
+      "sha256": "6f96ee5c2f4ff2b939a8df3fd7cff22dd57619b18bbcc6da9e2d101ddef8d6d2",
+      "bytes": 3231
+    },
+    {
+      "path": "tests/test_deepseek_client.py",
+      "git_blob": "261bc7329a5b63c2b8f1b6c79c59a6b354dddfe4",
+      "sha256": "f99fc764aa5e82afa1168498a7ab522c76f25d7b327fec09d19be03a3e508d1d",
+      "bytes": 5734
+    },
+    {
+      "path": "tests/test_evidence_and_gates.py",
+      "git_blob": "2cd9c6a7007adaea6f3e624ccc734c880b53ab19",
+      "sha256": "504c91b31f20adcdacd31e5c11afd1a2369b35219c30472cf76d6e47c6e2f4a7",
+      "bytes": 4169
+    },
+    {
+      "path": "tests/test_external_evidence.py",
+      "git_blob": "c4808d761bd313a1dcc5eefa14f6b546b08182e5",
+      "sha256": "95679dfadf77f0786fb85bccb9bdf5fba80aa572019e8a9fb4c483b12006be2a",
+      "bytes": 10962
+    },
+    {
+      "path": "tests/test_knowledge_memory_evolution.py",
+      "git_blob": "e15103c2d5046e2f2bdcd3807d8143b55fdd299c",
+      "sha256": "e6b5375d9a5a3712e32bcad4627af80df97738d6672d9e629f6973a5a1bccf39",
+      "bytes": 13599
+    },
+    {
+      "path": "tests/test_multiagent_web.py",
+      "git_blob": "668429f73eef9b0c68019093d0518b510d2f6c6c",
+      "sha256": "8b7c82de384c714beea29c3ab364805d01c34a78f0603b00e1a92926b7c2a325",
+      "bytes": 60205
+    },
+    {
+      "path": "tests/test_plugins.py",
+      "git_blob": "8bf236cb604c8a437af94844132fca842f65eccd",
+      "sha256": "33f50ea4e71208fdaf7b3191a79164b9f52f38ca36137aeaa52ba1416f7e204a",
+      "bytes": 5718
+    },
+    {
+      "path": "tests/test_sessions.py",
+      "git_blob": "212435714d514ef7c56c8633dfaab2603c7f3d74",
+      "sha256": "2d7bf44e9092ccdc731a33eea3e9c905f3f2229e94f09a1702786cb607ae0ad7",
+      "bytes": 2761
+    },
+    {
+      "path": "tests/test_workflow_runtime.py",
+      "git_blob": "cc6ffa120ced17ea33f88f9330fab28d503b2183",
+      "sha256": "937cd480adcce935dd160198d5c95c9a547e970ef17fbdfb5add124941a80715",
+      "bytes": 21332
+    },
+    {
+      "path": "tests/test_workflow_spec.py",
+      "git_blob": "ebacd91800aabac65091fbbf95e28fb4f0babca9",
+      "sha256": "768d740d8e6246eb8ca0188cebd88c8a8f260607510fc6b96742f2307042a960",
+      "bytes": 27674
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "document": "knowledge/07_binary_tree_definition.md",
+  "sha256": "F5BBD69F4E74E027C96CFC70D571CCF2BC9AC2C5647509BCCD48A27AD92385DA",
+  "kind": "本项目依据 OpenDSA 官方教材撰写的中文提要；不属于原先固定提交的三篇 RST 导入原文",
+  "source_url": "https://opendsa.cs.vt.edu/ODSA/Books/Everything/html/BinaryTree.html",
+  "license_url": "https://opendsa.cs.vt.edu/home/license",
+  "license": "MIT",
+  "curated_date": "2026-09-29"
+}

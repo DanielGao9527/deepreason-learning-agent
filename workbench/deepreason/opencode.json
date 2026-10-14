@@ -1,0 +1,100 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "architect",
+  "share": "disabled",
+  "autoupdate": "notify",
+  "permission": {
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "edit": "ask",
+    "bash": {
+      "*": "ask",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "rg *": "allow",
+      "opencode --version": "allow",
+      "opencode * --help": "allow"
+    },
+    "task": {
+      "*": "ask",
+      "researcher": "allow",
+      "critic": "allow"
+    },
+    "skill": {
+      "*": "allow",
+      "experimental-*": "ask"
+    },
+    "webfetch": "ask",
+    "websearch": "ask",
+    "external_directory": "ask",
+    "doom_loop": "ask"
+  },
+  "agent": {
+    "plan": {
+      "permission": {
+        "edit": "deny",
+        "bash": "ask",
+        "task": {
+          "*": "ask",
+          "researcher": "allow",
+          "critic": "allow"
+        }
+      }
+    },
+    "build": {
+      "permission": {
+        "edit": "ask",
+        "bash": "ask",
+        "task": {
+          "*": "ask",
+          "researcher": "allow",
+          "critic": "allow"
+        }
+      }
+    }
+  },
+  "command": {
+    "agent-stack": {
+      "description": "Review or extend the OpenCode-based agent stack with minimal custom framework code",
+      "agent": "architect",
+      "template": "Review this OpenCode-based agent stack for: $ARGUMENTS\n\nKeep the solution upstream-first. Prefer OpenCode agents, skills, permissions, commands, MCP, sessions, and native run/serve behavior before proposing custom code."
+    },
+    "agent-source-map": {
+      "description": "Map a requested capability to OpenCode native features or upstream extensions",
+      "agent": "architect",
+      "template": "Map this capability to existing OpenCode or upstream OSS features: $ARGUMENTS\n\nReturn: native OpenCode support, available MCP/skill/plugin options, unavoidable custom work, and the lowest-cost implementation path."
+    }
+  },
+  "compaction": {
+    "auto": true,
+    "prune": false,
+    "reserved": 10000
+  },
+  "watcher": {
+    "ignore": [
+      ".git/**",
+      "openclaude/**",
+      "logs/**",
+      "evidence/**",
+      "memory/**",
+      ".venv/**",
+      "node_modules/**",
+      "dist/**",
+      "build/**"
+    ]
+  },
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": false
+    },
+    "gh_grep": {
+      "type": "remote",
+      "url": "https://mcp.grep.app",
+      "enabled": false
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Heavy Reasoning Agent Template Config",
+  "type": "object",
+  "required": ["identity", "models", "knowledge", "memory", "gates", "skills", "evolution"],
+  "properties": {
+    "identity": {
+      "type": "object",
+      "required": ["name", "purpose", "audience", "failure_boundaries"],
+      "properties": {
+        "name": { "type": "string" },
+        "purpose": { "type": "string" },
+        "audience": { "type": "string" },
+        "failure_boundaries": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "models": {
+      "type": "object",
+      "required": ["planner", "worker", "critic", "grader"]
+    },
+    "knowledge": {
+      "type": "object",
+      "required": ["directory", "index_type", "top_k", "min_score"],
+      "properties": {
+        "directory": { "type": "string" },
+        "index_type": { "type": "string", "enum": ["local-keyword", "keyword", "hybrid", "local-hybrid", "bm25", "semantic", "graph"] },
+        "retrieval_methods": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["keyword", "bm25", "semantic", "graph", "wiki"] }
+        },
+        "fallback_methods": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["wiki"] }
+        },
+        "top_k": { "type": "integer", "minimum": 1 },
+        "min_score": { "type": "number", "minimum": 0 },
+        "chunk_size": { "type": "integer", "minimum": 300 },
+        "fallback_min_score": { "type": "number", "minimum": 0 },
+        "fallback_top_k": { "type": "integer", "minimum": 1 },
+        "wiki_top_k": { "type": "integer", "minimum": 1 },
+        "wiki_enabled": { "type": "boolean" },
+        "external_top_k": { "type": "integer", "minimum": 1 },
+        "external_timeout_seconds": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "required": ["directory", "partitions", "read_only_partitions", "write_requires_gate"]
+    },
+    "gates": {
+      "type": "object",
+      "required": ["min_evidence_by_risk", "approval_required_actions", "workspace_root"]
+    },
+    "skills": {
+      "type": "object",
+      "required": ["directory", "enabled"]
+    },
+    "evolution": {
+      "type": "object",
+      "required": ["enabled", "proposal_directory", "direct_mutation_allowed", "approval_required"]
+    },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "prefer_deepagents": { "type": "boolean" },
+        "workflow_spec": { "type": "string" },
+        "workflow_draft": { "type": "string" },
+        "workflow_proposal_dir": { "type": "string" },
+        "agents_spec": { "type": "string" },
+        "agents_draft": { "type": "string" },
+        "agents_proposal_dir": { "type": "string" },
+        "template_builtin_dir": { "type": "string" },
+        "template_user_dir": { "type": "string" },
+        "code_modifier": {
+          "type": "object",
+          "properties": {
+            "mode": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

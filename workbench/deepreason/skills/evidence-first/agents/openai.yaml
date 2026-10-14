@@ -1,0 +1,4 @@
+interface:
+  display_name: "Evidence First"
+  short_description: "Citable source-backed claims"
+  default_prompt: "Use $evidence-first to answer only with source-backed claims."
