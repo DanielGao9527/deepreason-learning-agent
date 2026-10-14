@@ -41,7 +41,7 @@
     {
       "id": "strict_speed_claim",
       "question": "哈希表一定比平衡二叉搜索树快吗？比较精确查找和范围查询。",
-      "expected_decision": "answered",
+      "expected_decision": "review_withheld",
       "source_anchors": [{"file": "03_choice_conditions.md", "contains": "至少要区分精确查找与范围查询、平均表现与最坏情况"}],
       "answer_facets": [
         {"id": "no_absolute", "any_of": ["不一定", "没有脱离场景的统一答案"]},

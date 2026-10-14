@@ -44,7 +44,8 @@ def main() -> int:
             result = LearningAssistant(workspace, client=client).ask(case["question"], thread_id="probe")
             rows.append(score_case(case, result, list(client.calls)))
     answered = [row for row in rows if row["expected_decision"] == "answered"]
-    stopped = [row for row in rows if row["expected_decision"] != "answered"]
+    reviewed = [row for row in rows if row["expected_decision"] == "review_withheld"]
+    stopped = [row for row in rows if row["expected_decision"].startswith("abstained")]
     report = {
         "rubric_status": rubric["label_status"],
         "corpus_sha256": actual_hash,
@@ -52,9 +53,11 @@ def main() -> int:
         "real_qwen_calls": 0,
         "cases": len(rows),
         "decision_matches": sum(row["decision_match"] for row in rows),
-        "qualified_anchor_cases": sum(all(row["qualified_anchor_hits"]) for row in answered),
+        "qualified_anchor_cases": sum(all(row["qualified_anchor_hits"]) for row in [*answered, *reviewed]),
+        "evidence_expected_cases": len(answered) + len(reviewed),
         "answered_cases": len(answered),
         "literal_answer_proxy_passes": sum(row["proxy_pass"] for row in answered),
+        "strict_review_withheld": sum(row["proxy_pass"] for row in reviewed),
         "correct_stop_boundaries": sum(row["proxy_pass"] for row in stopped),
         "stop_cases": len(stopped),
         "semantic_accuracy_measured": False,

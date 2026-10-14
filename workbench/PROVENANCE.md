@@ -91,3 +91,11 @@
 - lab 的 `scripts/eval_learning_answers.py`、`tests/test_learning_answer_probe.py`：用真实工作流和固定脚本模型跑新会话，保存逐题证据与结论；校准测试特意展示“关键词齐全但含义颠倒”仍会误过代理检查。
 
 六题终态 6/6，四题合格资料锚点 4/4，但脚本答案字面要点 0/4；两题按预期止答 2/2。此结果暴露当前固定脚本答案的教学内容缺口，**不是千问准确率，也不是 Skill 前后收益**。本课真实千问调用 0。详见 lab 的 `docs/lessons/LEARNING_22_ANSWER_QUALITY_PROBE.md`。
+
+第二十三课在完整工作副本中新增**学习严格题答案覆盖契约**；固定上游未改：
+
+- `src/reasoning_agent_template/learning.py`：本项目按问题明示维度生成有界清单，普通 guided 路径不启用。
+- `src/reasoning_agent_template/multiagent.py`、`output_review.py`：本项目在原独立 Reviewer 调用与引用结构审计上加可覆盖钩子、清单交付、草稿/清单上下文哈希回执及逐项摘录核验。通用上游风格场景无清单时保留既有行为。
+- `tests/test_learning_mvp.py` 与 lab 的三份离线脚本：完整正例、supported 但缺清单、重复/伪造摘录、缺项、标未覆盖和旧回执，均通过实际 Worker→审查→发布→会话路径验证；离线路径增加一例扣稿反例。
+
+完整副本 **189/189**，九类学习路径 **9/9**，七组 Skill 配对 **7/7**，真实千问 0。契约核验结构与本轮版本，不证明语义正确；来源及讲解见 lab 的 `docs/lessons/LEARNING_23_STRICT_ANSWER_COVERAGE_CONTRACT.md`。

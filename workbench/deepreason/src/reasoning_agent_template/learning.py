@@ -426,6 +426,23 @@ class LearningOrchestrator(MultiAgentOrchestrator):
         )
         return messages
 
+    def _output_review_requirements(self, message: str, state: AgentState) -> list[dict[str, str]]:
+        """Bounded checklist from the user's explicit learning question, not model prose."""
+        requirements = [
+            {"id": "direct_answer", "description": "直接回答问题，不把判断留给学习者自己完成"},
+        ]
+        for point_id, phrase, description in (
+            ("exact_lookup", "精确查找", "解释精确查找维度下的取舍及条件"),
+            ("range_query", "范围查询", "解释范围查询维度下的取舍及条件"),
+        ):
+            if phrase in message:
+                requirements.append({"id": point_id, "description": description})
+        if any(word in message for word in ("一定", "总是", "永远")):
+            requirements.append({"id": "absolute_boundary", "description": "说明绝对化结论的反例或适用边界"})
+        if len(requirements) == 1:
+            requirements.append({"id": "reasoning", "description": "给出支撑结论的原理或推理，而非只重复问题"})
+        return requirements
+
     def _deepseek_messages(self, message: str, state: AgentState, *, short_term_memory, long_term_memory):
         messages = super()._deepseek_messages(
             message, state, short_term_memory=short_term_memory, long_term_memory=long_term_memory

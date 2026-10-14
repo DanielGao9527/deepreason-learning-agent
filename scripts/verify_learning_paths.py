@@ -18,7 +18,7 @@ sys.path.insert(0, str(WORKBENCH))
 from reasoning_agent_template.learning import LearningAssistant  # noqa: E402
 from reasoning_agent_template.knowledge import LocalKnowledgeBase  # noqa: E402
 from reasoning_agent_template.workflow import TemplateCoordinator, WorkflowContractError  # noqa: E402
-from tests.test_learning_mvp import ScriptedLearningClient  # noqa: E402
+from tests.test_learning_mvp import CompleteLearningReviewClient, ScriptedLearningClient  # noqa: E402
 
 
 CASES = (
@@ -26,6 +26,9 @@ CASES = (
      ["route", "reviewer", "worker"], "supported"),
     ("deep_answer", "哈希表一定比平衡二叉搜索树快吗？比较精确查找和范围查询。",
      "answered", "deep", "allow", "released_model_reviewed",
+     ["route", "reviewer", "worker", "output_reviewer"], "supported"),
+    ("deep_missing_coverage", "哈希表一定比平衡二叉搜索树快吗？比较精确查找和范围查询。",
+     "review_withheld", "deep", "allow", "withheld",
      ["route", "reviewer", "worker", "output_reviewer"], "supported"),
     ("no_evidence", "请解释 ZxqvPrime-99 的内部缓存协议。",
      "abstained_no_evidence", "guided", "allow", "released_gate_only",
@@ -55,7 +58,8 @@ def _check_equal(case_id: str, label: str, observed: object, expected: object) -
 def _ordinary_case(parent: Path, spec: tuple) -> dict:
     case_id, question, decision, path, gate, release, calls, final_review = spec
     workspace = _workspace(parent, case_id)
-    client = ScriptedLearningClient(final_review=final_review)
+    client = (CompleteLearningReviewClient() if case_id == "deep_answer"
+              else ScriptedLearningClient(final_review=final_review))
     assistant = LearningAssistant(workspace, client=client)
     payload = assistant.ask(question, thread_id=case_id)
     observed_gate = payload["gates"]["decisions"][-1]["status"]
@@ -63,6 +67,9 @@ def _ordinary_case(parent: Path, spec: tuple) -> dict:
     _check_equal(case_id, "path", payload["learning"]["path"], path)
     _check_equal(case_id, "gate", observed_gate, gate)
     _check_equal(case_id, "release", payload["output_release"]["status"], release)
+    if case_id == "deep_missing_coverage":
+        _check_equal(case_id, "coverage rejection", payload["output_release"]["reason"],
+                     "answer_coverage_contract_failed")
     _check_equal(case_id, "model calls", client.calls, calls)
     saved = assistant.orchestrator.session_store.load(case_id)
     _check_equal(case_id, "published answer in session", saved.messages[-1]["content"], payload["answer"])

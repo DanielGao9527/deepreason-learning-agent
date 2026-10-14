@@ -7,6 +7,7 @@
 - 在 PowerShell 中连续提问；概念解释走引导路径，条件比较走严格证据与最终审查路径。
 - 从七份带来源的本地课程资料检索。学习场景在 `retrieve → reason` 交付前核对片段、源文件、哈希和 Evidence Ledger；资料不足时止答。
 - 对明确高风险请求增加只升级的路由下限。Gate 未放行或严格题最终审查失败时，扣留草稿，只交付可公开说明。
+- 学习严格题的最终审查按问题明示维度要求逐项覆盖清单和草稿原文摘录；程序核对清单、当前问题/草稿/证据版本与既有引用结构，缺项扣稿。程序不能独立判断摘录是否语义充分。
 - 对少数显式双主体比较题执行三步确定性证据计划：分别查询两个主体并汇合候选；若前四条候选排满却缺主体，最多扩大一次 Top-K，仍缺资料就跳过 Worker。任务 ID、依赖、处理器、步数与检索预算在运行前检查；源文件中途变化会阻断发布。
 - 坏计划、交付契约失败与模型不可用会留下脱敏的本地失败终态；失败文件不包含问题或模型正文，也不等于自动续跑。
 - 按 thread 恢复近期会话；本机 SQLite 在发送真实千问请求前预占名额，默认总上限为 100 次。
@@ -40,9 +41,11 @@ py -3.12 -m venv .venv
 
 批准前/后七组固定初态控制流回放可运行 `.\.venv\Scripts\python.exe scripts\replay_learning_skill_paths.py`；同一语料指纹、新会话和脚本模型下核对终态、Gate、发布、模型调用和失败会话边界。结果与答案质量限制见[第二十一课](docs/lessons/LEARNING_21_PAIRED_REPLAY_BOUNDARIES.md)。
 
+答案级离线诊断可运行 `.\.venv\Scripts\python.exe scripts\eval_learning_answers.py`。六题区分合格资料是否出现、答复字面要点是否覆盖及严格题是否扣稿；标签未经独立人工复核，字面检查不是语义准确率。缺口与发布契约分别见[第二十二课](docs/lessons/LEARNING_22_ANSWER_QUALITY_PROBE.md)、[第二十三课](docs/lessons/LEARNING_23_STRICT_ANSWER_COVERAGE_CONTRACT.md)。
+
 ## 验证与边界
 
-最简单的离线验收是在仓库根目录运行 `.\.venv\Scripts\python.exe scripts\verify_learning_paths.py`；七类代表性终态加一类有限补查案例、路径覆盖口径、预期结果与本次实测见[最小闭环测试报告](docs/MVP_TEST_REPORT.md)。运行 `.\.venv\Scripts\python.exe scripts\eval_bounded_recovery.py` 可复现相同初态下检索预算 1 次与 2 次的三组开关对照。
+最简单的离线验收是在仓库根目录运行 `.\.venv\Scripts\python.exe scripts\verify_learning_paths.py`；当前九例含严格题完整答案发布与覆盖清单缺失扣稿对照，路径覆盖口径、预期结果与实测见[最小闭环测试报告](docs/MVP_TEST_REPORT.md)。运行 `.\.venv\Scripts\python.exe scripts\eval_bounded_recovery.py` 可复现相同初态下检索预算 1 次与 2 次的三组开关对照。
 
 在 `workbench/deepreason` 目录运行离线测试：
 

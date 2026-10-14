@@ -28,6 +28,8 @@ def decide_reviewed_release(
     qualified_evidence_ids: set[str],
     evidence: Mapping[str, EvidenceItem],
     chunks: Sequence[KnowledgeChunk],
+    required_coverage: Sequence[str] = (),
+    review_context_hash: str = "",
 ) -> OutputReviewOutcome:
     """A model's support label only releases a draft after structural checks.
 
@@ -47,6 +49,11 @@ def decide_reviewed_release(
         return _withheld(gate_status, "invalid_review_status", 0)
     if review.get("coverage_complete") is not True or review.get("findings") != []:
         return _withheld(gate_status, "coverage_or_findings_invalid", 0)
+    coverage_errors = _coverage_errors(draft, review, required_coverage)
+    if coverage_errors:
+        return _withheld(gate_status, "answer_coverage_contract_failed", 0, coverage_errors)
+    if review_context_hash and review.get("review_context_hash") != review_context_hash:
+        return _withheld(gate_status, "review_context_mismatch", 0)
     audit = audit_claim_citations(
         review,
         gate_status=gate_status,
@@ -68,6 +75,40 @@ def decide_reviewed_release(
         checked_claims=audit.checked_claims,
         reasons=(),
     )
+
+
+def _coverage_errors(draft: str, review: Mapping[str, Any], required: Sequence[str]) -> tuple[str, ...]:
+    """Check completeness and exact draft provenance, not semantic adequacy."""
+    if not required:
+        return ()
+    coverage = review.get("coverage")
+    if not isinstance(coverage, list) or len(coverage) != len(required):
+        return ("missing_or_extra_coverage",)
+    expected = set(required)
+    seen_ids: set[str] = set()
+    seen_excerpts: set[str] = set()
+    errors: list[str] = []
+    for index, item in enumerate(coverage):
+        if not isinstance(item, dict):
+            errors.append(f"coverage_{index}:invalid_schema")
+            continue
+        point_id = item.get("point_id")
+        excerpt = item.get("draft_excerpt")
+        if not isinstance(point_id, str) or point_id not in expected or point_id in seen_ids:
+            errors.append(f"coverage_{index}:unknown_or_duplicate_point")
+            continue
+        seen_ids.add(point_id)
+        if item.get("status") != "covered":
+            errors.append(f"coverage_{index}:not_covered")
+        if not isinstance(excerpt, str) or not excerpt.strip() or excerpt not in draft:
+            errors.append(f"coverage_{index}:excerpt_missing_from_draft")
+        elif excerpt in seen_excerpts:
+            errors.append(f"coverage_{index}:reused_excerpt")
+        else:
+            seen_excerpts.add(excerpt)
+    if seen_ids != expected:
+        errors.append("coverage_ids_incomplete")
+    return tuple(errors)
 
 
 def _withheld(

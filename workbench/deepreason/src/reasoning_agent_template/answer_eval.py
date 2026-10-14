@@ -36,6 +36,9 @@ def score_case(case: Mapping[str, Any], result: Mapping[str, Any], model_calls: 
             "qualified_evidence" if not all(anchor_hits) else
             "answer_wording" if not all(facet_hits) else "none"
         )
+    elif expected == "review_withheld":
+        proxy_pass = decision_match and release == "withheld" and "worker" in model_calls and all(anchor_hits)
+        failure_layer = "none" if proxy_pass else "review_boundary"
     else:
         proxy_pass = decision_match and "worker" not in model_calls
         failure_layer = "none" if proxy_pass else "stop_boundary"

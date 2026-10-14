@@ -1579,15 +1579,27 @@ class MultiAgentOrchestrator:
                 )
         raise RuntimeError("unreachable retry state")
 
+    def _output_review_requirements(self, message: str, state: AgentState) -> list[dict[str, str]]:
+        """Scenario hook; the generic upstream-style reviewer has no fixed checklist."""
+        return []
+
     def _review_output_answer(
         self, message: str, draft: str, state: AgentState
     ) -> tuple[Any, list[dict[str, Any]]]:
+        requirements = self._output_review_requirements(message, state)
         eligible_ids = set(state.qualified_evidence_ids)
         chunks = [
             chunk
             for chunk in [*state.retrieval_results, *state.external_results]
             if chunk.evidence_id in eligible_ids
         ][:8]
+        review_context_hash = stable_hash(json.dumps(
+            {"question": message, "draft": draft, "requirements": requirements,
+             "qualified_evidence": [
+                 {"id": chunk.evidence_id, "hash": chunk.content_hash} for chunk in chunks
+             ]},
+            ensure_ascii=False, sort_keys=True,
+        )) if requirements else ""
         evidence = {item.id: item for item in state.evidence}
         sources = [
             {
@@ -1606,13 +1618,19 @@ class MultiAgentOrchestrator:
                     "Use review_status=supported only if every material claim in the draft is supported by "
                     "the supplied evidence. Otherwise use issue or uncertain. For supported, include "
                     "coverage_complete=true, findings=[], and claims with claim_id, statement, "
-                    "evidence_id, excerpt copied exactly from the source. Do not invent citations."
+                    "evidence_id, excerpt copied exactly from the source. Do not invent citations. "
+                    "When coverage_requirements is nonempty, return coverage with exactly one item "
+                    "per point_id: point_id, status=covered|missing|unsupported, and draft_excerpt "
+                    "copied exactly from the draft for covered items. Mark issue if any point is "
+                    "missing or unsupported. Each covered point needs its own distinct excerpt. "
+                    "Copy review_context_hash exactly from the request into the review JSON."
                 ),
             ),
             ChatMessage(
                 role="user",
                 content=json.dumps(
-                    {"question": message, "draft": draft, "qualified_sources": sources},
+                    {"question": message, "draft": draft, "qualified_sources": sources,
+                     "coverage_requirements": requirements, "review_context_hash": review_context_hash},
                     ensure_ascii=False,
                 ),
             ),
@@ -1625,7 +1643,7 @@ class MultiAgentOrchestrator:
                 client,
                 messages,
                 temperature=0.0,
-                max_tokens=850,
+                max_tokens=1200 if requirements else 850,
                 agent="output_reviewer",
                 retry_kind="output_review_retry",
             )
@@ -1658,6 +1676,8 @@ class MultiAgentOrchestrator:
             qualified_evidence_ids=eligible_ids,
             evidence=evidence,
             chunks=chunks,
+            required_coverage=[item["id"] for item in requirements],
+            review_context_hash=review_context_hash,
         )
         events.append(
             {

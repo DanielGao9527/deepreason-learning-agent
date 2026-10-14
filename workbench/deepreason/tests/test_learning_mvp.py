@@ -75,6 +75,60 @@ class ScriptedLearningClient:
         return ChatResult(content=content, model=self.model, raw={"offline": True})
 
 
+class CompleteLearningReviewClient(ScriptedLearningClient):
+    """A scripted complete answer to prove the new contract can release."""
+    ANSWER = (
+        "不一定。哈希表在哈希分布合理时，按键精确查找平均较快。"
+        "平衡二叉搜索树保持有序，范围查询更适合树。"
+        "最坏情况下哈希冲突会拖慢查找，因此不能说哈希表一定更快。"
+    )
+    EXCERPTS = {
+        "direct_answer": "不一定。",
+        "exact_lookup": "哈希表在哈希分布合理时，按键精确查找平均较快。",
+        "range_query": "平衡二叉搜索树保持有序，范围查询更适合树。",
+        "absolute_boundary": "最坏情况下哈希冲突会拖慢查找，因此不能说哈希表一定更快。",
+    }
+
+    def __init__(self, *, coverage_fault: str | None = None):
+        super().__init__()
+        self.coverage_fault = coverage_fault
+
+    def chat(self, messages, *, temperature, max_tokens):
+        prompt = "\n".join(message.content for message in messages)
+        if "OUTPUT_REVIEW_JSON" in prompt:
+            self.calls.append("output_reviewer")
+            request = json.loads(messages[-1].content)
+            source = request["qualified_sources"][0]
+            coverage = [
+                {"point_id": requirement["id"], "status": "covered",
+                 "draft_excerpt": self.EXCERPTS[requirement["id"]]}
+                for requirement in request["coverage_requirements"]
+            ]
+            if self.coverage_fault == "duplicate_excerpt":
+                coverage[1]["draft_excerpt"] = coverage[0]["draft_excerpt"]
+            elif self.coverage_fault == "fabricated_excerpt":
+                coverage[1]["draft_excerpt"] = "草稿没有说过这一句"
+            elif self.coverage_fault == "missing_point":
+                coverage.pop()
+            elif self.coverage_fault == "unsupported":
+                coverage[1]["status"] = "unsupported"
+            binding = request["review_context_hash"]
+            if self.coverage_fault == "stale_binding":
+                binding = "old-draft-review"
+            content = json.dumps({
+                "review_status": "supported", "coverage_complete": True, "findings": [],
+                "review_context_hash": binding,
+                "claims": [{"claim_id": "c1", "statement": request["draft"],
+                            "evidence_id": source["evidence_id"], "excerpt": source["text"][:24]}],
+                "coverage": coverage,
+            }, ensure_ascii=False)
+            return ChatResult(content=content, model=self.model, raw={"offline": True})
+        if "ROUTING_DECISION_JSON" in prompt or "REVIEW_DECISION_JSON" in prompt:
+            return super().chat(messages, temperature=temperature, max_tokens=max_tokens)
+        self.calls.append("worker")
+        return ChatResult(content=self.ANSWER, model=self.model, raw={"offline": True})
+
+
 class LearningMvpTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -105,7 +159,7 @@ class LearningMvpTests(unittest.TestCase):
         self.assertEqual(client.calls, ["route", "reviewer", "worker"])
         self.assertFalse((self.root / "local_state" / "failures").exists())
 
-    def test_conditional_question_uses_strict_path_and_two_local_sources(self):
+    def test_conditional_question_without_coverage_is_withheld_despite_supported_label(self):
         client = ScriptedLearningClient()
         answer = LearningAssistant(self.root, client=client).ask(
             "哈希表一定比平衡二叉搜索树快吗？比较精确查找和范围查询。",
@@ -117,9 +171,31 @@ class LearningMvpTests(unittest.TestCase):
         self.assertEqual(answer["gates"]["decisions"][-1]["status"], "allow")
         self.assertGreaterEqual(len(answer["evidence"]["qualified_evidence_ids"]), 2)
         self.assertEqual(answer["external_evidence"]["attempted_sources"], [])
-        self.assertEqual(answer["output_release"]["status"], "released_model_reviewed")
-        self.assertEqual(answer["learning"]["decision"], "answered")
+        self.assertEqual(answer["output_release"]["status"], "withheld")
+        self.assertEqual(answer["output_release"]["reason"], "answer_coverage_contract_failed")
+        self.assertEqual(answer["learning"]["decision"], "review_withheld")
+        self.assertNotIn("结论取决于", answer["answer"])
         self.assertEqual(client.calls, ["route", "reviewer", "worker", "output_reviewer"])
+
+    def test_complete_coverage_releases_and_bad_provenance_withholds(self):
+        question = "哈希表一定比平衡二叉搜索树快吗？比较精确查找和范围查询。"
+        for fault in (None, "duplicate_excerpt", "fabricated_excerpt", "missing_point", "unsupported", "stale_binding"):
+            with self.subTest(fault=fault):
+                root = self.root / (fault or "complete")
+                shutil.copytree(CORPUS, root / "knowledge")
+                client = CompleteLearningReviewClient(coverage_fault=fault)
+                answer = LearningAssistant(root, client=client).ask(question, thread_id="strict")
+                saved = LearningAssistant(root, client=client).orchestrator.session_store.load("strict")
+                if fault is None:
+                    self.assertEqual(answer["output_release"]["status"], "released_model_reviewed")
+                    self.assertEqual(answer["answer"], CompleteLearningReviewClient.ANSWER)
+                else:
+                    self.assertEqual(answer["output_release"]["status"], "withheld")
+                    self.assertEqual(answer["output_release"]["reason"],
+                                     "review_context_mismatch" if fault == "stale_binding"
+                                     else "answer_coverage_contract_failed")
+                    self.assertNotIn(CompleteLearningReviewClient.ANSWER, json.dumps(saved.to_dict(), ensure_ascii=False))
+                self.assertEqual(saved.messages[-1]["content"], answer["answer"])
 
     def test_simple_protected_request_keeps_high_risk_despite_weak_model_route(self):
         client = ScriptedLearningClient()  # Deliberately returns routine/low/none.
