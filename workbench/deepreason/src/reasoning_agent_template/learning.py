@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sqlite3
+import tempfile
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -235,6 +236,71 @@ class LearningTemplateCoordinator(TemplateCoordinator):
 
 
 class LearningOrchestrator(MultiAgentOrchestrator):
+    def _record_failed_run(
+        self, *, run_id: str, started_at: str, error: Exception,
+        status_snapshot: dict[str, Any] | None,
+    ) -> None:
+        """Persist only control-flow metadata; prompts and drafts stay out of the trace."""
+        snapshot = status_snapshot or {}
+        if isinstance(error, LearningPlanError):
+            terminal = "plan_invalid"
+            reason = str(error) if str(error) in {
+                "unsupported_plan", "invalid_step_budget", "invalid_task",
+                "duplicate_or_missing_task_id", "unavailable_handler",
+                "missing_completion_contract", "missing_retrieval_query",
+                "invalid_comparison_tasks", "invalid_join_task", "missing_dependency",
+                "duplicate_dependency", "invalid_join_dependencies", "cyclic_dependencies",
+            } else "unknown_plan_error"
+        elif isinstance(error, WorkflowContractError):
+            terminal = "handoff_rejected"
+            reason = _safe_trace_label(error.code)
+        elif isinstance(error, (LLMRequestError, MissingApiKeyError, QwenCallLimitError)):
+            terminal = "model_unavailable"
+            reason = "http_error" if isinstance(error, LLMRequestError) else type(error).__name__
+        else:
+            terminal = "unexpected_error"
+            reason = "unclassified"
+        hint = snapshot.get("working_hint") or {}
+        state_machine = snapshot.get("state_machine") or {}
+        events = snapshot.get("events") or []
+        trace = {
+            "schema_version": 1,
+            "run_id": run_id,
+            "started_at": started_at,
+            "finished_at": utc_now(),
+            "terminal_status": terminal,
+            "reason_code": reason,
+            "phase": _safe_trace_label(hint.get("phase")),
+            "stage": _safe_trace_label(hint.get("stage")),
+            "completed_stages": [
+                _safe_trace_label(stage) for stage in state_machine.get("trace", [])[-20:]
+            ],
+            "event_kinds": [
+                _safe_trace_label(event.get("kind")) for event in events[-120:]
+                if isinstance(event, dict)
+            ],
+            "session_saved": False if terminal != "unexpected_error" else None,
+        }
+        if isinstance(error, WorkflowContractError):
+            trace["edge_id"] = _safe_trace_label(error.edge_id)
+        if isinstance(error, LLMRequestError):
+            trace["http_status"] = error.status_code if isinstance(error.status_code, int) and 100 <= error.status_code <= 599 else None
+            trace["retryable"] = bool(error.retryable)
+        directory = self.workspace_root / "local_state" / "failures"
+        directory.mkdir(parents=True, exist_ok=True)
+        temporary: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=directory,
+                                             prefix=".failure-", suffix=".tmp", delete=False) as output:
+                temporary = Path(output.name)
+                json.dump(trace, output, ensure_ascii=False, indent=2)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, directory / f"{run_id}.json")
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+
     def _workflow_coordinator(self, *, event_callback):
         return LearningTemplateCoordinator(
             config=self.config, workspace_root=self.workspace_root, event_callback=event_callback,
@@ -323,6 +389,11 @@ class LearningOrchestrator(MultiAgentOrchestrator):
         return super()._call_deepseek(
             message, state, short_term_memory=short_term_memory, long_term_memory=long_term_memory
         )
+
+
+def _safe_trace_label(value: Any) -> str:
+    """Keep diagnostic labels, never arbitrary model or user text."""
+    return value if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_:-]{1,64}", value) else "unknown"
 
 
 class LearningAssistant:

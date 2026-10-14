@@ -69,6 +69,7 @@ def _ordinary_case(parent: Path, spec: tuple) -> dict:
         raise AssertionError(f"{case_id}: withheld Worker draft reached the saved session")
     if decision.startswith("abstained") and "worker" in client.calls:
         raise AssertionError(f"{case_id}: Worker ran despite insufficient evidence")
+    _check_equal(case_id, "failure trace count", len(list((workspace / "local_state" / "failures").glob("*.json"))), 0)
     plan_status = payload["workflow"].get("execution_plan", {}).get("status")
     if case_id == "incomplete_comparison":
         _check_equal(case_id, "evidence plan", plan_status, "blocked_missing_subject")
@@ -114,6 +115,12 @@ def _invalid_handoff(parent: Path) -> dict:
     _check_equal(case_id, "model calls", client.calls, ["route", "reviewer"])
     saved = (workspace / "sessions" / case_id / "snapshot.json").exists()
     _check_equal(case_id, "session saved", saved, False)
+    failure_files = list((workspace / "local_state" / "failures").glob("*.json"))
+    _check_equal(case_id, "failure trace count", len(failure_files), 1)
+    failure_trace = json.loads(failure_files[0].read_text(encoding="utf-8"))
+    _check_equal(case_id, "terminal status", failure_trace["terminal_status"], "handoff_rejected")
+    _check_equal(case_id, "reason code", failure_trace["reason_code"], "evidence_missing")
+    _check_equal(case_id, "trace session status", failure_trace["session_saved"], False)
     return {
         "case": case_id,
         "expected_result": "WorkflowContractError:evidence_missing",
@@ -125,6 +132,7 @@ def _invalid_handoff(parent: Path) -> dict:
         "qualified_evidence_count": None,
         "stage_trace": None,
         "session_saved": saved,
+        "failure_trace": failure_trace["terminal_status"],
         "passed": True,
     }
 

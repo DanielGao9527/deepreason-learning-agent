@@ -251,9 +251,20 @@ class MultiAgentOrchestrator:
             long_term_after = self._load_long_term_memories(
                 limit=int(self.config.memory.get("prompt_long_term_items", 12))
             )
-        except Exception:
+        except Exception as exc:
             with self._status_lock:
-                self._active_run = None
+                failed_status = copy.deepcopy(self._active_run)
+            try:
+                self._record_failed_run(
+                    run_id=run_id, started_at=started_at, error=exc,
+                    status_snapshot=failed_status,
+                )
+            except Exception:
+                # Diagnostic storage must never replace the original failure.
+                pass
+            finally:
+                with self._status_lock:
+                    self._active_run = None
             raise
         events.append(
             {
@@ -402,6 +413,12 @@ class MultiAgentOrchestrator:
             workspace_root=self.workspace_root,
             event_callback=event_callback,
         )
+
+    def _record_failed_run(
+        self, *, run_id: str, started_at: str, error: Exception,
+        status_snapshot: dict[str, Any] | None,
+    ) -> None:
+        """Scenario-specific runtimes may persist a redacted terminal trace."""
 
     def status(self) -> dict[str, Any]:
         with self._status_lock:

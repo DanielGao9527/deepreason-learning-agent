@@ -13,6 +13,7 @@ from urllib.error import HTTPError
 from reasoning_agent_template.learning import (
     BudgetedQwenClient,
     LearningAssistant,
+    LearningOrchestrator,
     QwenCallLimitError,
     interactive_session,
     main,
@@ -81,6 +82,12 @@ class LearningMvpTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def _failure_trace(self, root: Path) -> tuple[dict, str]:
+        files = list((root / "local_state" / "failures").glob("*.json"))
+        self.assertEqual(len(files), 1)
+        raw = files[0].read_text(encoding="utf-8")
+        return json.loads(raw), raw
+
     def test_concept_question_uses_local_evidence_and_guided_path(self):
         client = ScriptedLearningClient()
         answer = LearningAssistant(self.root, client=client).ask("什么是哈希冲突？", thread_id="learner-a")
@@ -94,6 +101,7 @@ class LearningMvpTests(unittest.TestCase):
         self.assertEqual(answer["external_evidence"]["attempted_sources"], [])
         self.assertEqual(answer["output_release"]["status"], "released_gate_only")
         self.assertEqual(client.calls, ["route", "reviewer", "worker"])
+        self.assertFalse((self.root / "local_state" / "failures").exists())
 
     def test_conditional_question_uses_strict_path_and_two_local_sources(self):
         client = ScriptedLearningClient()
@@ -221,6 +229,13 @@ class LearningMvpTests(unittest.TestCase):
                 self.assertEqual(caught.exception.code, expected)
                 self.assertEqual(client.calls, ["route", "reviewer"])
                 self.assertFalse((root / "sessions" / "handoff-failed" / "snapshot.json").exists())
+                trace, raw = self._failure_trace(root)
+                self.assertEqual(trace["terminal_status"], "handoff_rejected")
+                self.assertEqual(trace["reason_code"], expected)
+                self.assertEqual(trace["edge_id"], "retrieve_to_reason")
+                self.assertEqual(trace["stage"], "retrieve")
+                self.assertFalse(trace["session_saved"])
+                self.assertNotIn("什么是哈希冲突", raw)
 
     def test_general_binary_definition_cannot_answer_two_special_shape_definitions(self):
         questions = (
@@ -324,6 +339,12 @@ class LearningMvpTests(unittest.TestCase):
                 self.assertEqual(str(caught.exception), reason)
                 self.assertEqual(client.calls, ["route", "reviewer"])
                 self.assertFalse((root / "sessions" / "bad-plan" / "snapshot.json").exists())
+                trace, raw = self._failure_trace(root)
+                self.assertEqual(trace["terminal_status"], "plan_invalid")
+                self.assertEqual(trace["reason_code"], reason)
+                self.assertEqual(trace["stage"], "plan")
+                self.assertFalse(trace["session_saved"])
+                self.assertNotIn("满二叉树和完全二叉树", raw)
 
     def test_call_limit_persists_and_counts_attempts_before_send(self):
         class Client:
@@ -363,6 +384,45 @@ class LearningMvpTests(unittest.TestCase):
         self.assertEqual(sent.call_count, 1)
         self.assertEqual(BudgetedQwenClient.calls_used_at(usage_db), 1)
         self.assertFalse((self.root / "sessions" / "quota-failure" / "snapshot.json").exists())
+        trace, raw = self._failure_trace(self.root)
+        self.assertEqual(trace["terminal_status"], "model_unavailable")
+        self.assertEqual(trace["stage"], "intake")
+        self.assertEqual(trace["http_status"], 403)
+        self.assertFalse(trace["retryable"])
+        self.assertNotIn("quota exhausted", raw)
+
+    def test_failure_trace_is_durable_and_redacts_inputs_and_provider_text(self):
+        class FailingRoute(ScriptedLearningClient):
+            def chat(self, messages, *, temperature, max_tokens):
+                raise LLMRequestError(
+                    "PRIVATE_ERROR_VALUE", status_code=403, retryable=False,
+                    provider_code="PRIVATE_PROVIDER_CODE",
+                )
+
+        assistant = LearningAssistant(self.root, client=FailingRoute())
+        with self.assertRaises(LLMRequestError):
+            assistant.ask("PRIVATE_QUESTION_VALUE", thread_id="PRIVATE_THREAD_VALUE")
+        trace, raw = self._failure_trace(self.root)
+        self.assertEqual(trace["terminal_status"], "model_unavailable")
+        self.assertEqual(trace["http_status"], 403)
+        self.assertFalse(trace["session_saved"])
+        for secret in ("PRIVATE_ERROR_VALUE", "PRIVATE_PROVIDER_CODE", "PRIVATE_QUESTION_VALUE", "PRIVATE_THREAD_VALUE"):
+            self.assertNotIn(secret, raw)
+        self.assertFalse((self.root / "sessions" / "PRIVATE_THREAD_VALUE" / "snapshot.json").exists())
+        # Failure evidence is a file, not merely the old orchestrator's in-memory status.
+        LearningAssistant(self.root, client=ScriptedLearningClient())
+        self.assertEqual(self._failure_trace(self.root)[0]["run_id"], trace["run_id"])
+
+    def test_trace_write_failure_preserves_original_model_error(self):
+        class FailingRoute(ScriptedLearningClient):
+            def chat(self, messages, *, temperature, max_tokens):
+                raise LLMRequestError("original model failure", status_code=403, retryable=False)
+
+        assistant = LearningAssistant(self.root, client=FailingRoute())
+        with patch.object(LearningOrchestrator, "_record_failed_run", side_effect=OSError("disk failure")):
+            with self.assertRaisesRegex(LLMRequestError, "original model failure"):
+                assistant.ask("什么是哈希冲突？")
+        self.assertFalse((self.root / "local_state" / "failures").exists())
 
     def test_transient_routing_error_retries_once_within_budget(self):
         class FailOnce(ScriptedLearningClient):
