@@ -69,3 +69,11 @@
 - `src/reasoning_agent_template/learning.py`、`tests/test_learning_notes.py`：增加显式命令行读、写、查回执和离线故障注入；命令适配使用确定性模型桩走上游 Runtime，普通学习问答**没有**自动 tool calling。`.gitignore` 忽略本地笔记库；不把个人笔记加入仓库。
 
 针对性测试与完整回归的最终结果见 lab 的 `docs/lessons/LEARNING_19_TOOL_EXECUTION_ASSURANCE.md`。这是一种**单场景适配**，不能写成通用 MCP 工具层、任意写工具持久幂等或完整长期记忆。
+
+第二十课以第十九课的明确笔记作为来源，新增一个**固定比较题规则**的 Skill 候选实验，固定上游未改：
+
+- `src/reasoning_agent_template/learning_skill.py`：本项目与 AI 协作新增候选/版本 SQLite。候选记录来源笔记 ID/正文哈希、旧版与新内容哈希；固定三例检查正常、缺证据、非比较题。显式批准时重算内容、来源与评测并核对旧版；回退按当前哈希切回旧版。只有允许列表中的固定教学指令可以进入系统提示。
+- `src/reasoning_agent_template/learning.py`：只在比较计划完成、Gate 放行且有合格证据时，将已批准规则加入 Worker system prompt；命令行增加查看、从笔记提案、哈希绑定批准和回退。它没有扩展上游 `SkillRegistry` 为通用加载器，亦不让模型自主修改 Skill。
+- `tests/test_learning_skill.py`、lab 的 `scripts/eval_learning_skill_candidate.py`：正常/前提变化/反例、过宽触发、内容或评测被改、来源错误、旧版冲突、完整脚本问答批准前后及回退后的 Worker 提示，均离线核验。固定三例 2/3→3/3 仅是触发判断，不是答案正确率；真实千问 0。
+
+上游 `memory.py` 的短/长期结构、`skills.py` 的元数据发现及 `evolution.py` 的仅提案 JSON 属于原有代码；本项目只是核对并记录边界。完整源码和限制见 lab 的 `docs/lessons/LEARNING_20_MEMORY_AND_SKILL_LIFECYCLE.md`。

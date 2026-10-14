@@ -16,6 +16,7 @@ from reasoning_agent_template.config import AgentConfig
 from reasoning_agent_template.llm import ChatMessage, ChatResult, DeepSeekChatClient, LLMRequestError, MissingApiKeyError
 from reasoning_agent_template.learning_plan import LearningPlanError, build_comparison_plan, ordered_plan_tasks
 from reasoning_agent_template.learning_notes import LearningNoteStore, execute_learning_note_command
+from reasoning_agent_template.learning_skill import LearningSkillError, LearningSkillStore
 from reasoning_agent_template.knowledge import LocalKnowledgeBase, SUPPORTED_EXTENSIONS
 from reasoning_agent_template.models import AgentState, utc_now
 from reasoning_agent_template.multiagent import MultiAgentOrchestrator
@@ -435,6 +436,14 @@ class LearningOrchestrator(MultiAgentOrchestrator):
             "只依据本轮提供的证据；不知道就明确说不知道。不要把提问本身推断成学习者能力画像。"
         )
         messages[0] = ChatMessage(role="system", content=messages[0].content.replace("DeepSeek API", "千问 API") + teacher_guide)
+        gate_allowed = bool(state.gate_decisions and state.gate_decisions[-1].status == "allow")
+        skill_instruction = LearningSkillStore(self.workspace_root).instruction_for(
+            message,
+            evidence_ready=(gate_allowed and bool(state.qualified_evidence_ids)
+                            and state.execution_plan.get("status") == "completed"),
+        )
+        if skill_instruction:
+            messages[0] = ChatMessage(role="system", content=messages[0].content + "\n已审批教学 Skill：" + skill_instruction)
         messages[1] = ChatMessage(role="user", content=messages[1].content.replace("DeepSeek 实时", "千问实时"))
         return messages
 
@@ -561,14 +570,49 @@ def main(argv: Sequence[str] | None = None) -> int:
     note_action.add_argument("--notes", action="store_true", help="查看当前 thread 的本地学习笔记，不调用模型")
     note_action.add_argument("--save-note", help="明确保存一条本地学习笔记，不调用模型")
     note_action.add_argument("--note-receipt", help="按操作 ID 核对笔记写入回执，不调用模型")
+    note_action.add_argument("--skill-status", action="store_true", help="查看教学 Skill 当前版本，不调用模型")
+    note_action.add_argument("--skill-propose-from-note", help="从一条明确笔记提出比较题 Skill 候选")
+    note_action.add_argument("--skill-approve", help="批准指定候选 ID；必须同时给出内容哈希")
+    note_action.add_argument("--skill-rollback", type=int, help="回退到指定旧版本；必须核对当前内容哈希")
     parser.add_argument("--operation-id", help="笔记写入的幂等操作 ID；重试必须使用同一个 ID")
     parser.add_argument("--expected-version", type=int, help="保存笔记时预期的 thread 版本")
+    parser.add_argument("--skill-trigger", choices=["explicit_comparison", "any"], default="explicit_comparison")
+    parser.add_argument("--candidate-hash", help="批准前核对候选内容哈希")
+    parser.add_argument("--expected-current-hash", help="回退前核对当前 Skill 内容哈希")
     args = parser.parse_args(argv)
     if args.usage:
         print(f"千问调用：{BudgetedQwenClient.calls_used_at(USAGE_DB)}/{MAX_QWEN_CALLS}")
         return 0
     if (args.operation_id is not None or args.expected_version is not None) and args.save_note is None:
         parser.error("--operation-id 和 --expected-version 只能配合 --save-note 使用。")
+    if args.skill_status or args.skill_propose_from_note is not None or args.skill_approve is not None or args.skill_rollback is not None:
+        if args.question or args.interactive or args.json:
+            parser.error("Skill 命令不能与问答、--interactive 或 --json 同用。")
+        skills = LearningSkillStore(args.workspace)
+        try:
+            if args.skill_status:
+                result = skills.active()
+            elif args.skill_propose_from_note is not None:
+                result = skills.propose_from_note(
+                    thread_id=args.thread, operation_id=args.skill_propose_from_note,
+                    feedback_kind="missing_preconditions", trigger=args.skill_trigger,
+                )
+            elif args.skill_approve is not None:
+                if not args.candidate_hash:
+                    parser.error("--skill-approve 需要 --candidate-hash。")
+                result = skills.approve(args.skill_approve, expected_hash=args.candidate_hash,
+                                        approved_by="explicit-local-command")
+            else:
+                if not args.expected_current_hash:
+                    parser.error("--skill-rollback 需要 --expected-current-hash。")
+                result = skills.rollback(args.skill_rollback,
+                                         expected_current_hash=args.expected_current_hash,
+                                         approved_by="explicit-local-command")
+        except (LearningSkillError, ValueError) as exc:
+            print(f"Skill 操作未完成：{exc}")
+            return 2
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
     if args.notes or args.save_note is not None or args.note_receipt is not None:
         if args.question or args.interactive or args.json:
             parser.error("笔记命令不能与问答、--interactive 或 --json 同用。")

@@ -31,6 +31,7 @@ handoff/
 !/scripts/learning_mvp_demo.py
 !/scripts/verify_learning_paths.py
 !/scripts/eval_bounded_recovery.py
+!/scripts/eval_learning_skill_candidate.py
 
 # Upstream authoring instructions and mutable evidence stay local.
 /workbench/deepreason/.opencode/

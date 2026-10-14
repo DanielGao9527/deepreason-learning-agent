@@ -11,6 +11,7 @@
 - 坏计划、交付契约失败与模型不可用会留下脱敏的本地失败终态；失败文件不包含问题或模型正文，也不等于自动续跑。
 - 按 thread 恢复近期会话；本机 SQLite 在发送真实千问请求前预占名额，默认总上限为 100 次。
 - 明确保存和查看本地学习笔记：写入通过上游工具门禁与 SQLite 持久回执，同一操作 ID 可在重启或响应丢失后安全核对；不会从普通提问自动写笔记。
+- 对“比较题缺少成立前提”的明确反馈，可生成一条教学 Skill 候选；三例触发对照、内容哈希和旧版检查通过后，显式批准才会影响证据齐全的比较题 Worker 提示，可回退。当前仅是一个固定规则实验。
 
 上述能力的归属及限制见[改动清单](workbench/PROVENANCE.md)和[项目状态](docs/PROJECT_STATUS.md)；下一阶段按[开发路径](docs/DEVELOPMENT_PATH.md)推进。上游的工作流、检索器和 SessionStore 是复用代码；本项目的学习场景、交付检查、发布保护及评测由维护者与 AI 协作完成。
 
@@ -34,6 +35,8 @@ py -3.12 -m venv .venv
 输入 `/usage` 查看已预占的真实请求次数，`/exit` 退出。不要把 Key 写入仓库；`.env.example` 仅列出配置名，程序不会自动读取它。`workbench/deepreason/learning_mvp/knowledge/` 是小型教学语料，并非完整计算机知识库。
 
 学习笔记无需模型配置。先运行 `.\.venv\Scripts\python.exe run_learning.py --notes --thread note-demo` 查看当前版本；若为 0，运行 `.\.venv\Scripts\python.exe run_learning.py --save-note "复习哈希冲突" --thread note-demo --operation-id note-001 --expected-version 0` 保存，再用 `--note-receipt note-001 --thread note-demo` 核对。超时后保留原操作 ID 和正文；具体实验见[第十九课](docs/lessons/LEARNING_19_TOOL_EXECUTION_ASSURANCE.md)。笔记只按本地 thread 命名空间隔离，没有登录用户认证，也不会自动变成长期画像或 Skill。
+
+无 Key 的 Skill 固定初态实验：`.\.venv\Scripts\python.exe scripts\eval_learning_skill_candidate.py`。它从测试笔记提出候选、拒绝过宽触发、模拟明确审批并回退，记录的是三例**触发判断**而非教学效果。手动操作及记忆边界见[第二十课](docs/lessons/LEARNING_20_MEMORY_AND_SKILL_LIFECYCLE.md)。
 
 ## 验证与边界
 
