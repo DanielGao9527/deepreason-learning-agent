@@ -69,6 +69,11 @@ def _ordinary_case(parent: Path, spec: tuple) -> dict:
         raise AssertionError(f"{case_id}: withheld Worker draft reached the saved session")
     if decision.startswith("abstained") and "worker" in client.calls:
         raise AssertionError(f"{case_id}: Worker ran despite insufficient evidence")
+    plan_status = payload["workflow"].get("execution_plan", {}).get("status")
+    if case_id == "incomplete_comparison":
+        _check_equal(case_id, "evidence plan", plan_status, "blocked_missing_subject")
+        _check_equal(case_id, "plan subtask events",
+                     len([event for event in payload["events"] if event.get("kind") == "plan_task_completed"]), 3)
     return {
         "case": case_id,
         "expected_result": decision,
@@ -80,6 +85,7 @@ def _ordinary_case(parent: Path, spec: tuple) -> dict:
         "qualified_evidence_count": len(payload["evidence"]["qualified_evidence_ids"]),
         "stage_trace": payload["state_machine"]["trace"],
         "session_saved": True,
+        "plan_status": plan_status,
         "passed": True,
     }
 

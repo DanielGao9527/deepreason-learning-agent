@@ -163,9 +163,7 @@ class MultiAgentOrchestrator:
                 hint="状态机已启动，正在进入工作流节点链。",
                 events=events,
             )
-            result = TemplateCoordinator(
-                config=self.config,
-                workspace_root=self.workspace_root,
+            result = self._workflow_coordinator(
                 event_callback=lambda progress_state, event: self._set_active_state(
                     run_id=run_id,
                     thread_id=thread_id,
@@ -397,6 +395,13 @@ class MultiAgentOrchestrator:
             self._last_run = copy.deepcopy(payload)
             self._active_run = None
         return payload
+
+    def _workflow_coordinator(self, *, event_callback):
+        return TemplateCoordinator(
+            config=self.config,
+            workspace_root=self.workspace_root,
+            event_callback=event_callback,
+        )
 
     def status(self) -> dict[str, Any]:
         with self._status_lock:
@@ -931,6 +936,7 @@ class MultiAgentOrchestrator:
             "active": False,
             "current": state.current_stage,
             "variant": state.workflow_variant,
+            "execution_plan": dict(state.execution_plan),
             "spec": {
                 "name": spec.name,
                 "revision": spec.revision,
@@ -1120,7 +1126,7 @@ class MultiAgentOrchestrator:
                     "reasons": list(state.evidence_reasons),
                 },
             },
-            "actual_output": {"plan_steps": list(state.plan)},
+            "actual_output": {"plan_steps": list(state.plan), "execution_plan": dict(state.execution_plan)},
             "process": self._stage_event_messages(state, "plan"),
             "handoff": self._stage_handoff("plan"),
         }
@@ -1130,6 +1136,7 @@ class MultiAgentOrchestrator:
             "actual_input": {
                 "query": state.user_goal,
                 "plan_steps": list(state.plan),
+                "execution_plan": dict(state.execution_plan),
                 "evidence_sources": list(state.evidence_sources),
                 "external_sources_attempted": list(state.external_search_attempted),
             },

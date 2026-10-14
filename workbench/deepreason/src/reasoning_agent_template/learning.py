@@ -12,11 +12,12 @@ from typing import Any, Sequence
 
 from reasoning_agent_template.config import AgentConfig
 from reasoning_agent_template.llm import ChatMessage, ChatResult, DeepSeekChatClient, LLMRequestError, MissingApiKeyError
-from reasoning_agent_template.models import AgentState
+from reasoning_agent_template.learning_plan import LearningPlanError, build_comparison_plan, ordered_plan_tasks
+from reasoning_agent_template.models import AgentState, utc_now
 from reasoning_agent_template.multiagent import MultiAgentOrchestrator
 from reasoning_agent_template.risk import classify_evidence_requirement
 from reasoning_agent_template.sessions import SessionStore
-from reasoning_agent_template.workflow import WorkflowContractError
+from reasoning_agent_template.workflow import TemplateCoordinator, WorkflowContractError
 
 
 DEFAULT_WORKSPACE = Path(__file__).resolve().parents[2] / "learning_mvp"
@@ -168,7 +169,77 @@ def _explicit_comparison_subjects(question: str) -> tuple[str, str] | None:
     return (left, match.group(2)) if len(left) >= 2 else None
 
 
+class LearningTemplateCoordinator(TemplateCoordinator):
+    """Execute a small evidence plan for explicit two-subject comparisons."""
+
+    def _plan(self, state: AgentState) -> None:
+        super()._plan(state)
+        subjects = _explicit_comparison_subjects(state.user_goal)
+        if subjects is None:
+            return
+        plan = build_comparison_plan(*subjects)
+        ordered_plan_tasks(plan)  # Reject a malformed plan before any retrieval.
+        state.execution_plan = plan
+        state.plan.append("分别检索两个比较主体，再检查两侧资料是否齐全。")
+
+    def _retrieve(self, state: AgentState) -> None:
+        if not state.execution_plan:
+            super()._retrieve(state)
+            return
+        tasks = ordered_plan_tasks(state.execution_plan)
+        original_goal = state.user_goal
+        selected_chunks = {}
+        selected_evidence = {}
+        diagnostics = []
+        methods = []
+        try:
+            for task in tasks:
+                if task["handler"] == "join_evidence":
+                    dependencies = [item for item in tasks if item["id"] in task["depends_on"]]
+                    complete = all(item.get("status") == "completed" for item in dependencies)
+                    task["status"] = "completed" if complete else "blocked_missing_subject"
+                    task["candidate_evidence_ids"] = list(dict.fromkeys(
+                        evidence_id for item in dependencies for evidence_id in item.get("candidate_evidence_ids", [])
+                    )) if complete else []
+                    state.stage_events.append({
+                        "time": utc_now(), "agent": "retriever", "stage": "retrieve", "kind": "plan_task_completed",
+                        "task_id": task["id"], "status": task["status"],
+                        "candidate_count": len(task["candidate_evidence_ids"]),
+                    })
+                    continue
+                state.user_goal = task["query"]
+                super()._retrieve(state)
+                matching = [chunk for chunk in state.retrieval_results if task["subject"] in chunk.text]
+                task["candidate_evidence_ids"] = [chunk.evidence_id for chunk in matching]
+                task["status"] = "completed" if matching else "missing_subject_source"
+                for chunk in matching:
+                    previous = selected_chunks.get(chunk.evidence_id)
+                    if previous is None or chunk.score > previous.score:
+                        selected_chunks[chunk.evidence_id] = chunk
+                selected_evidence.update((item.id, item) for item in state.evidence if item.id in task["candidate_evidence_ids"])
+                diagnostics.extend({**item, "plan_task_id": task["id"]} for item in state.rag_diagnostics)
+                methods.extend(method for method in state.rag_methods if method not in methods)
+                state.stage_events.append({
+                    "time": utc_now(), "agent": "retriever", "stage": "retrieve", "kind": "plan_task_completed",
+                    "task_id": task["id"], "status": task["status"],
+                    "candidate_count": len(matching),
+                })
+        finally:
+            state.user_goal = original_goal
+        state.retrieval_results = list(selected_chunks.values())
+        state.evidence = list(selected_evidence.values())
+        state.external_results = []
+        state.rag_diagnostics = diagnostics
+        state.rag_methods = methods
+        state.execution_plan["status"] = tasks[-1]["status"]
+
+
 class LearningOrchestrator(MultiAgentOrchestrator):
+    def _workflow_coordinator(self, *, event_callback):
+        return LearningTemplateCoordinator(
+            config=self.config, workspace_root=self.workspace_root, event_callback=event_callback,
+        )
+
     def _write_explicit_long_term_memory(self, message: str) -> list[Any]:
         # MVP only restores recent turns. A learning question or one user's wording
         # must not silently become a durable learner profile.
@@ -222,6 +293,13 @@ class LearningOrchestrator(MultiAgentOrchestrator):
         return _local_learning_route(route, message), review, events
 
     def _call_deepseek(self, message: str, state: AgentState, *, short_term_memory, long_term_memory):
+        if state.execution_plan and state.execution_plan.get("status") != "completed":
+            return (
+                NO_EVIDENCE_ANSWER,
+                {"enabled": True, "provider": "qwen", "model": self.config.models["worker"]["model"],
+                 "status": "skipped", "reason": "incomplete_comparison_plan"},
+                [],
+            )
         gate = state.gate_decisions[-1].status if state.gate_decisions else "missing"
         if gate != "allow" or not state.qualified_evidence_ids:
             reason = "gate_blocked" if gate != "allow" else "no_qualified_local_evidence"
@@ -273,7 +351,7 @@ class LearningAssistant:
         release_status = result["output_release"]["status"]
         if gate_status != "allow":
             decision = "blocked"
-        elif result["runtime"]["llm"].get("reason") == "missing_comparison_subjects":
+        elif result["runtime"]["llm"].get("reason") in {"missing_comparison_subjects", "incomplete_comparison_plan"}:
             decision = "abstained_incomplete_evidence"
         elif not qualified:
             decision = "abstained_no_evidence"
@@ -327,7 +405,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("请提供学习问题，或使用 --interactive 连续提问。")
     try:
         payload = LearningAssistant(args.workspace).ask(" ".join(args.question), thread_id=args.thread)
-    except (MissingApiKeyError, QwenCallLimitError, WorkflowContractError) as exc:
+    except (MissingApiKeyError, QwenCallLimitError, WorkflowContractError, LearningPlanError) as exc:
         parser.exit(2, str(exc) + "\n")
     except LLMRequestError as exc:
         parser.exit(2, f"模型请求失败：{exc}。本轮未生成回答。\n")
@@ -342,6 +420,10 @@ def print_learning_answer(payload: dict[str, Any]) -> None:
     print("\n回答：\n" + payload["answer"])
     print("路径：" + payload["learning"]["path"] + "；结果：" + payload["learning"]["decision"])
     print("门禁：" + (payload["gates"]["decisions"][-1]["status"] if payload["gates"]["decisions"] else "missing"))
+    plan = payload["workflow"].get("execution_plan", {})
+    if plan:
+        print("比较计划：" + "；".join(f"{task['id']}={task.get('status', 'pending')}"
+                              for task in plan["tasks"]))
     for source in payload["learning"]["sources"]:
         print("资料：" + (source["original_url"] or source["uri"]) + " # " + source["locator"])
     print("轨迹：" + " -> ".join(payload["state_machine"]["trace"]))
@@ -393,7 +475,7 @@ def interactive_session(assistant: LearningAssistant, *, thread_id: str = "defau
         before = BudgetedQwenClient.calls_used_at(USAGE_DB)
         try:
             payload = assistant.ask(question, thread_id=thread_id)
-        except (MissingApiKeyError, QwenCallLimitError, LLMRequestError, WorkflowContractError) as exc:
+        except (MissingApiKeyError, QwenCallLimitError, LLMRequestError, WorkflowContractError, LearningPlanError) as exc:
             print(f"本轮失败（{type(exc).__name__}）：{exc}")
         except Exception as exc:
             print(f"本轮失败（{type(exc).__name__}）。本次未得到可交付答案；请检查配置或用测试复现。")

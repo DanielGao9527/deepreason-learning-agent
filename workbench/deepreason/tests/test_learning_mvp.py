@@ -18,6 +18,8 @@ from reasoning_agent_template.learning import (
     main,
     timing_breakdown,
 )
+from reasoning_agent_template.learning_plan import LearningPlanError, build_comparison_plan
+from reasoning_agent_template.knowledge import LocalKnowledgeBase
 from reasoning_agent_template.llm import ChatResult, DeepSeekChatClient, LLMRequestError
 from reasoning_agent_template.workflow import TemplateCoordinator, WorkflowContractError
 
@@ -236,9 +238,12 @@ class LearningMvpTests(unittest.TestCase):
                 self.assertIn(answer["learning"]["decision"],
                               {"abstained_incomplete_evidence", "abstained_no_evidence"})
                 self.assertIn(answer["runtime"]["llm"]["reason"],
-                              {"missing_comparison_subjects", "no_qualified_local_evidence"})
+                              {"incomplete_comparison_plan", "no_qualified_local_evidence"})
                 if index == 0:
-                    self.assertEqual(answer["runtime"]["llm"]["reason"], "missing_comparison_subjects")
+                    self.assertEqual(answer["runtime"]["llm"]["reason"], "incomplete_comparison_plan")
+                plan = answer["workflow"]["execution_plan"]
+                self.assertEqual(plan["kind"], "two_subject_evidence")
+                self.assertEqual(plan["status"], "blocked_missing_subject")
                 self.assertEqual(client.calls, ["route", "reviewer"])
                 self.assertEqual(answer["learning"]["sources"], [])
                 self.assertNotIn("结论取决于", answer["answer"])
@@ -250,12 +255,75 @@ class LearningMvpTests(unittest.TestCase):
             encoding="utf-8",
         )
         client = ScriptedLearningClient()
-        answer = LearningAssistant(self.root, client=client).ask(
-            "满二叉树和完全二叉树的定义有什么区别？", thread_id="shape-covered"
-        )
+        original_retrieve = LocalKnowledgeBase.retrieve
+        queries = []
+        shared_scores = {}
+
+        def tracked_retrieve(kb, query, **kwargs):
+            queries.append(query)
+            results = original_retrieve(kb, query, **kwargs)
+            for chunk in results:
+                if "满二叉树" in chunk.text and "完全二叉树" in chunk.text:
+                    shared_scores.setdefault(chunk.evidence_id, []).append(chunk.score)
+            return results
+
+        with patch.object(LocalKnowledgeBase, "retrieve", tracked_retrieve):
+            answer = LearningAssistant(self.root, client=client).ask(
+                "满二叉树和完全二叉树的定义有什么区别？", thread_id="shape-covered"
+            )
 
         self.assertEqual(answer["learning"]["decision"], "answered")
         self.assertIn("worker", client.calls)
+        plan = answer["workflow"]["execution_plan"]
+        self.assertEqual(plan["status"], "completed")
+        self.assertEqual([task["id"] for task in plan["tasks"]],
+                         ["lookup_left", "lookup_right", "join_evidence"])
+        self.assertTrue(all(task["status"] == "completed" for task in plan["tasks"]))
+        self.assertEqual(len([event for event in answer["events"] if event.get("kind") == "plan_task_completed"]), 3)
+        self.assertEqual(queries, ["满二叉树", "完全二叉树"])
+        self.assertTrue(any(len(scores) == 2 for scores in shared_scores.values()))
+        final_scores = {chunk["evidence_id"]: chunk["score"] for chunk in answer["rag"]["results"]}
+        for evidence_id, scores in shared_scores.items():
+            if len(scores) == 2:
+                self.assertEqual(final_scores[evidence_id], max(scores))
+        for task in plan["tasks"][:2]:
+            self.assertTrue(task["candidate_evidence_ids"])
+            self.assertTrue(any(task["subject"] in chunk["text"] for chunk in answer["rag"]["results"]))
+
+    def test_invalid_comparison_plan_stops_before_retrieval_and_session_save(self):
+        def bad_plan(fault):
+            plan = build_comparison_plan("满二叉树", "完全二叉树")
+            if fault == "missing_dependency":
+                plan["tasks"][2]["depends_on"] = ["not_a_task"]
+            elif fault == "cycle":
+                plan["tasks"][0]["depends_on"] = ["lookup_right"]
+                plan["tasks"][1]["depends_on"] = ["lookup_left"]
+            elif fault == "unavailable_handler":
+                plan["tasks"][0]["handler"] = "shell"
+            else:
+                plan["max_steps"] = 4
+            return plan
+
+        for fault, reason in (
+            ("missing_dependency", "missing_dependency"),
+            ("cycle", "cyclic_dependencies"),
+            ("unavailable_handler", "unavailable_handler"),
+            ("step_budget", "invalid_step_budget"),
+        ):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                shutil.copytree(CORPUS, root / "knowledge")
+                client = ScriptedLearningClient()
+                with patch("reasoning_agent_template.learning.build_comparison_plan", return_value=bad_plan(fault)):
+                    with patch.object(LocalKnowledgeBase, "retrieve") as retrieve:
+                        with self.assertRaises(LearningPlanError) as caught:
+                            LearningAssistant(root, client=client).ask(
+                                "满二叉树和完全二叉树的定义有什么区别？", thread_id="bad-plan"
+                            )
+                retrieve.assert_not_called()
+                self.assertEqual(str(caught.exception), reason)
+                self.assertEqual(client.calls, ["route", "reviewer"])
+                self.assertFalse((root / "sessions" / "bad-plan" / "snapshot.json").exists())
 
     def test_call_limit_persists_and_counts_attempts_before_send(self):
         class Client:

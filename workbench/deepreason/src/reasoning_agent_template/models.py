@@ -102,6 +102,7 @@ class AgentState:
     evidence_reasons: list[str] = field(default_factory=list)
     evidence_sources: list[str] = field(default_factory=list)
     plan: list[str] = field(default_factory=list)
+    execution_plan: dict[str, Any] = field(default_factory=dict)
     retrieval_results: list[KnowledgeChunk] = field(default_factory=list)
     rag_methods: list[str] = field(default_factory=list)
     rag_diagnostics: list[dict[str, Any]] = field(default_factory=list)
