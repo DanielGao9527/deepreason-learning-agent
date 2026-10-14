@@ -3,19 +3,22 @@ import io
 import shutil
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 from reasoning_agent_template.learning import (
     BudgetedQwenClient,
     LearningAssistant,
     QwenCallLimitError,
     interactive_session,
+    main,
     timing_breakdown,
 )
-from reasoning_agent_template.llm import ChatResult
+from reasoning_agent_template.llm import ChatResult, DeepSeekChatClient, LLMRequestError
 from reasoning_agent_template.workflow import TemplateCoordinator, WorkflowContractError
 
 
@@ -274,6 +277,89 @@ class LearningMvpTests(unittest.TestCase):
             second.chat([], temperature=0, max_tokens=10)
         self.assertEqual(backend.calls, 2)
         self.assertEqual(first.calls_used(), 2)
+
+    def test_quota_http_403_stops_after_one_reserved_request(self):
+        backend = DeepSeekChatClient(api_key="offline-test-key", base_url="https://example.invalid")
+        usage_db = self.root / "local_state" / "qwen_usage.sqlite3"
+        assistant = LearningAssistant(self.root, client=BudgetedQwenClient(backend, usage_db))
+
+        def quota_error(req, timeout):
+            body = b'{"error":{"code":"AllocationQuota.FreeTierOnly","message":"quota exhausted"}}'
+            raise HTTPError(req.full_url, 403, "Forbidden", {}, BytesIO(body))
+
+        with patch("reasoning_agent_template.llm.request.urlopen", side_effect=quota_error) as sent:
+            with self.assertRaises(LLMRequestError) as caught:
+                assistant.ask("什么是哈希冲突？", thread_id="quota-failure")
+        self.assertFalse(caught.exception.retryable)
+        self.assertEqual(caught.exception.provider_code, "AllocationQuota.FreeTierOnly")
+        self.assertEqual(sent.call_count, 1)
+        self.assertEqual(BudgetedQwenClient.calls_used_at(usage_db), 1)
+        self.assertFalse((self.root / "sessions" / "quota-failure" / "snapshot.json").exists())
+
+    def test_transient_routing_error_retries_once_within_budget(self):
+        class FailOnce(ScriptedLearningClient):
+            def __init__(self):
+                super().__init__()
+                self.attempts = 0
+
+            def chat(self, messages, *, temperature, max_tokens):
+                self.attempts += 1
+                if self.attempts == 1:
+                    raise LLMRequestError("Model API HTTP 503", status_code=503, retryable=True)
+                return super().chat(messages, temperature=temperature, max_tokens=max_tokens)
+
+        backend = FailOnce()
+        usage_db = self.root / "local_state" / "qwen_usage.sqlite3"
+        answer = LearningAssistant(self.root, client=BudgetedQwenClient(backend, usage_db)).ask(
+            "什么是哈希冲突？", thread_id="transient-routing"
+        )
+        self.assertEqual(answer["learning"]["decision"], "answered")
+        self.assertEqual(backend.attempts, 4)  # Failed route + successful route/reviewer/worker.
+        self.assertEqual(BudgetedQwenClient.calls_used_at(usage_db), 4)
+        self.assertTrue(any(event["kind"] == "routing_retry" for event in answer["events"]))
+
+    def test_worker_quota_error_does_not_retry_or_save_session(self):
+        class FailWorker(ScriptedLearningClient):
+            def __init__(self):
+                super().__init__()
+                self.worker_attempts = 0
+
+            def chat(self, messages, *, temperature, max_tokens):
+                prompt = "\n".join(message.content for message in messages)
+                if not any(marker in prompt for marker in
+                           ("ROUTING_DECISION_JSON", "REVIEW_DECISION_JSON", "OUTPUT_REVIEW_JSON")):
+                    self.worker_attempts += 1
+                    raise LLMRequestError("Model API HTTP 403", status_code=403, retryable=False)
+                return super().chat(messages, temperature=temperature, max_tokens=max_tokens)
+
+        backend = FailWorker()
+        usage_db = self.root / "local_state" / "qwen_usage.sqlite3"
+        assistant = LearningAssistant(self.root, client=BudgetedQwenClient(backend, usage_db))
+        with self.assertRaises(LLMRequestError):
+            assistant.ask("什么是哈希冲突？", thread_id="worker-quota-failure")
+        self.assertEqual(backend.worker_attempts, 1)
+        self.assertEqual(BudgetedQwenClient.calls_used_at(usage_db), 3)
+        self.assertFalse((self.root / "sessions" / "worker-quota-failure" / "snapshot.json").exists())
+
+    def test_single_question_cli_reports_model_failure_without_traceback(self):
+        class FailingAssistant:
+            def __init__(self, workspace):
+                pass
+
+            def ask(self, question, *, thread_id):
+                raise LLMRequestError(
+                    "Model API HTTP 403 (AllocationQuota.FreeTierOnly)",
+                    status_code=403, retryable=False,
+                )
+
+        stderr = io.StringIO()
+        with patch("reasoning_agent_template.learning.LearningAssistant", FailingAssistant), redirect_stderr(stderr):
+            with self.assertRaises(SystemExit) as caught:
+                main(["什么是哈希冲突？"])
+        self.assertEqual(caught.exception.code, 2)
+        self.assertIn("模型请求失败", stderr.getvalue())
+        self.assertIn("HTTP 403", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_same_thread_restores_recent_turns_after_restart_without_cross_thread_leak(self):
         client = ScriptedLearningClient()

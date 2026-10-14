@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import http.client
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -21,7 +22,14 @@ class MissingApiKeyError(RuntimeError):
 
 
 class LLMRequestError(RuntimeError):
-    pass
+    def __init__(
+        self, message: str, *, retryable: bool = True,
+        status_code: int | None = None, provider_code: str | None = None,
+    ):
+        super().__init__(message)
+        self.retryable = retryable
+        self.status_code = status_code
+        self.provider_code = provider_code
 
 
 @dataclass(frozen=True)
@@ -121,8 +129,15 @@ class DeepSeekChatClient:
             with request.urlopen(req, timeout=self.timeout_seconds) as response:
                 body = response.read().decode("utf-8")
         except error.HTTPError as exc:
-            details = exc.read().decode("utf-8", errors="replace")
-            raise LLMRequestError(f"DeepSeek HTTP {exc.code}: {details}") from exc
+            provider_code = _provider_error_code(exc.read())
+            label = f" ({provider_code})" if provider_code else ""
+            raise LLMRequestError(
+                f"Model API HTTP {exc.code}{label}",
+                retryable=(exc.code in {408, 429} or exc.code >= 500)
+                and provider_code != "AllocationQuota.FreeTierOnly",
+                status_code=exc.code,
+                provider_code=provider_code,
+            ) from exc
         except error.URLError as exc:
             raise LLMRequestError(f"DeepSeek request failed: {exc.reason}") from exc
         except (TimeoutError, http.client.HTTPException, OSError) as exc:
@@ -134,6 +149,15 @@ class DeepSeekChatClient:
         except (KeyError, IndexError, TypeError) as exc:
             raise LLMRequestError(f"DeepSeek response missing assistant content: {data}") from exc
         return ChatResult(content=content, model=str(data.get("model", self.model)), raw=data)
+
+
+def _provider_error_code(body: bytes) -> str | None:
+    try:
+        payload = json.loads(body)
+        code = payload.get("error", {}).get("code")
+    except (ValueError, AttributeError, TypeError):
+        return None
+    return code if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,80}", code) else None
 
 
 def _load_local_secrets(workspace_root: Path) -> dict[str, Any]:

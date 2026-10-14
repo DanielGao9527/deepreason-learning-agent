@@ -3,8 +3,10 @@ import os
 import tempfile
 import unittest
 from http.client import IncompleteRead, RemoteDisconnected
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 from reasoning_agent_template.config import AgentConfig
 from reasoning_agent_template.llm import ChatMessage, DeepSeekChatClient, LLMRequestError, MissingApiKeyError
@@ -71,6 +73,30 @@ class DeepSeekClientTests(unittest.TestCase):
                 with patch("reasoning_agent_template.llm.request.urlopen", fake_urlopen):
                     with self.assertRaises(LLMRequestError):
                         client.chat([ChatMessage(role="user", content="ping")], temperature=0)
+
+    def test_http_status_classifies_retryability_without_echoing_response_body(self):
+        cases = (
+            (400, "Test.Error", False), (401, "Test.Error", False),
+            (403, "AllocationQuota.FreeTierOnly", False),
+            (408, "Test.Error", True), (429, "Test.Error", True),
+            (429, "AllocationQuota.FreeTierOnly", False), (503, "Test.Error", True),
+        )
+        client = DeepSeekChatClient(api_key="secret-test-key", model="deepseek-v4-flash")
+        for status, code, retryable in cases:
+            with self.subTest(status=status, code=code):
+
+                def fake_urlopen(req, timeout):
+                    body = json.dumps({"error": {"code": code, "message": "private provider details"}})
+                    raise HTTPError(req.full_url, status, "test", {}, BytesIO(body.encode("utf-8")))
+
+                with patch("reasoning_agent_template.llm.request.urlopen", fake_urlopen):
+                    with self.assertRaises(LLMRequestError) as caught:
+                        client.chat([ChatMessage(role="user", content="ping")], temperature=0)
+                self.assertEqual(caught.exception.status_code, status)
+                self.assertEqual(caught.exception.provider_code, code)
+                self.assertEqual(caught.exception.retryable, retryable)
+                self.assertNotIn("private provider details", str(caught.exception))
+                self.assertNotIn("secret-test-key", str(caught.exception))
 
     def test_missing_api_key_is_explicit(self):
         with patch.dict(os.environ, {}, clear=True):

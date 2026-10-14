@@ -329,6 +329,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         payload = LearningAssistant(args.workspace).ask(" ".join(args.question), thread_id=args.thread)
     except (MissingApiKeyError, QwenCallLimitError, WorkflowContractError) as exc:
         parser.exit(2, str(exc) + "\n")
+    except LLMRequestError as exc:
+        parser.exit(2, f"模型请求失败：{exc}。本轮未生成回答。\n")
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:

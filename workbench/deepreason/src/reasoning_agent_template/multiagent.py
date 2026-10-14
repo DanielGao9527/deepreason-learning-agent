@@ -1538,7 +1538,7 @@ class MultiAgentOrchestrator:
                 return client.chat(messages, temperature=temperature, max_tokens=max_tokens), events
             except LLMRequestError as exc:
                 duration_ms = round((perf_counter() - attempt_started) * 1000, 2)
-                if attempt >= max_attempts:
+                if attempt >= max_attempts or not exc.retryable:
                     raise
                 events.append(
                     {
@@ -1546,7 +1546,7 @@ class MultiAgentOrchestrator:
                         "agent": agent,
                         "kind": retry_kind,
                         "duration_ms": duration_ms,
-                        "message": f"DeepSeek call failed, retrying once: {exc}",
+                        "message": f"Model call failed, retrying once: {exc}",
                     }
                 )
         raise RuntimeError("unreachable retry state")
@@ -1674,7 +1674,7 @@ class MultiAgentOrchestrator:
                 break
             except LLMRequestError as exc:
                 duration_ms = round((perf_counter() - attempt_started) * 1000, 2)
-                if attempt >= max_attempts:
+                if attempt >= max_attempts or not exc.retryable:
                     raise
                 events.append(
                     {
@@ -1682,7 +1682,7 @@ class MultiAgentOrchestrator:
                         "agent": "reasoner",
                         "kind": "llm_retry",
                         "duration_ms": duration_ms,
-                        "message": f"DeepSeek 调用失败，准备重试：{exc}",
+                        "message": f"模型调用失败，准备重试：{exc}",
                     }
                 )
         duration_ms = round((perf_counter() - started) * 1000, 2)
@@ -1694,7 +1694,7 @@ class MultiAgentOrchestrator:
                 "agent": "reasoner",
                 "kind": "llm_completed",
                 "duration_ms": duration_ms,
-                "message": "DeepSeek 已生成回答。",
+                "message": "模型已生成回答。",
             }
         )
         return (

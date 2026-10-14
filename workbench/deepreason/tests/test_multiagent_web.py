@@ -735,13 +735,14 @@ class MultiAgentWebTests(unittest.TestCase):
                 self.assertIn("working_hint", running)
 
                 completed = None
-                for _ in range(50):
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
                     status = _get_json(f"{base_url}/api/status")
                     if status["status"] == "completed":
                         completed = status
                         break
                     time.sleep(0.02)
-                self.assertIsNotNone(completed)
+                self.assertIsNotNone(completed, f"last status before deadline: {status['status']}")
                 self.assertEqual(completed["answer"], "FINAL_AFTER_BLOCK")
         finally:
             release_event.set()
