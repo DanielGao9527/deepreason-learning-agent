@@ -77,3 +77,10 @@
 - `tests/test_learning_skill.py`、lab 的 `scripts/eval_learning_skill_candidate.py`：正常/前提变化/反例、过宽触发、内容或评测被改、来源错误、旧版冲突、完整脚本问答批准前后及回退后的 Worker 提示，均离线核验。固定三例 2/3→3/3 仅是触发判断，不是答案正确率；真实千问 0。
 
 上游 `memory.py` 的短/长期结构、`skills.py` 的元数据发现及 `evolution.py` 的仅提案 JSON 属于原有代码；本项目只是核对并记录边界。完整源码和限制见 lab 的 `docs/lessons/LEARNING_20_MEMORY_AND_SKILL_LIFECYCLE.md`。
+
+第二十一课增加 lab 级离线配对回放，固定上游及工作副本运行策略均未改：
+
+- `scripts/replay_learning_skill_paths.py`：本项目与 AI 协作新增每题两份全新工作区的控制流对照。拷贝相同课程语料并校验 SHA-256，固定脚本模型与明确反馈笔记，仅切换 Skill 是否已获哈希绑定批准；核对七类终态、Gate、发布、模型调用、阶段轨迹、会话快照，以及坏交付失败记录。报告保存 run ID、耗时与原始逐例结果在忽略版本控制的 `artifacts/analysis/`。
+- 结果是 **7/7** 配对终态符合预期、意外控制流变化 **0/7**、目标 Worker 提示加载 **1/7**、脚本模型调用差 **0**；真实千问 0。这是控制流回归，不是答案语义正确率或性能提升。
+
+原理、复现和局限见 lab 的 `docs/lessons/LEARNING_21_PAIRED_REPLAY_BOUNDARIES.md`。

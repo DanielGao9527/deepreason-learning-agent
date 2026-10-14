@@ -38,6 +38,8 @@ py -3.12 -m venv .venv
 
 无 Key 的 Skill 固定初态实验：`.\.venv\Scripts\python.exe scripts\eval_learning_skill_candidate.py`。它从测试笔记提出候选、拒绝过宽触发、模拟明确审批并回退，记录的是三例**触发判断**而非教学效果。手动操作及记忆边界见[第二十课](docs/lessons/LEARNING_20_MEMORY_AND_SKILL_LIFECYCLE.md)。
 
+批准前/后七组固定初态控制流回放可运行 `.\.venv\Scripts\python.exe scripts\replay_learning_skill_paths.py`；同一语料指纹、新会话和脚本模型下核对终态、Gate、发布、模型调用和失败会话边界。结果与答案质量限制见[第二十一课](docs/lessons/LEARNING_21_PAIRED_REPLAY_BOUNDARIES.md)。
+
 ## 验证与边界
 
 最简单的离线验收是在仓库根目录运行 `.\.venv\Scripts\python.exe scripts\verify_learning_paths.py`；七类代表性终态加一类有限补查案例、路径覆盖口径、预期结果与本次实测见[最小闭环测试报告](docs/MVP_TEST_REPORT.md)。运行 `.\.venv\Scripts\python.exe scripts\eval_bounded_recovery.py` 可复现相同初态下检索预算 1 次与 2 次的三组开关对照。
