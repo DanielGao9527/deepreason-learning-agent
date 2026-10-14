@@ -32,6 +32,8 @@ py -3.12 -m venv .venv
 
 ## 验证与边界
 
+最简单的离线验收是在仓库根目录运行 `.\.venv\Scripts\python.exe scripts\verify_learning_paths.py`；七类代表性终态、路径覆盖口径、预期结果与本次实测见[最小闭环测试报告](docs/MVP_TEST_REPORT.md)。
+
 在 `workbench/deepreason` 目录运行离线测试：
 
 ```powershell
@@ -46,4 +48,4 @@ $env:PYTHONPATH='src'
 - DeepReason 固定上游提交：`e98313d661527c3aa6677eec08a3b54b4ab88a33`，详情见[来源记录](UPSTREAM.md)。原仓库快照未包含 LICENSE 文件；维护者此前表示已从作者处确认 MIT 授权。这里不把上游代码写成原创成果。
 - OpenDSA 教材原文及本项目中文提要的来源、固定提交、哈希与许可见 `workbench/deepreason/learning_mvp/SOURCE_MANIFEST.json`、`CURATED_SOURCE_MANIFEST.json` 和随附的 `source/OpenDSA/MIT-license.txt`。
 
-本仓库不包含本地密钥、会话、个人记录、调用计数、运行报告、虚拟环境或交接压缩包；固定上游完整快照可通过上述提交获取。
+本仓库不包含本地密钥、会话、个人记录、调用计数、原始运行产物、虚拟环境或交接压缩包；固定上游完整快照可通过上述提交获取。
