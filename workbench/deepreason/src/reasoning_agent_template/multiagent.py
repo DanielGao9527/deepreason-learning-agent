@@ -230,6 +230,7 @@ class MultiAgentOrchestrator:
                 }
             )
 
+            self._before_publish(result.state)
             memory_writes = self._write_explicit_long_term_memory(message)
             short_term_memory_store.append(user=message, assistant=answer, run_id=run_id)
             if self.session_store is not None:
@@ -419,6 +420,9 @@ class MultiAgentOrchestrator:
         status_snapshot: dict[str, Any] | None,
     ) -> None:
         """Scenario-specific runtimes may persist a redacted terminal trace."""
+
+    def _before_publish(self, state: AgentState) -> None:
+        """Scenario-specific runtimes may recheck mutable preconditions before persistence."""
 
     def status(self) -> dict[str, Any]:
         with self._status_lock:

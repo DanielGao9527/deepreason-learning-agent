@@ -12,6 +12,8 @@ def build_comparison_plan(left: str, right: str) -> dict[str, Any]:
     return {
         "kind": "two_subject_evidence",
         "max_steps": 3,
+        "max_retrieval_attempts_per_subject": 2,
+        "recovery_top_k": 12,
         "tasks": [
             {
                 "id": "lookup_left", "depends_on": [], "handler": "local_rag",
@@ -41,6 +43,11 @@ def ordered_plan_tasks(plan: dict[str, Any]) -> list[dict[str, Any]]:
     tasks = plan.get("tasks")
     if not isinstance(tasks, list) or not 1 <= len(tasks) <= 3 or plan.get("max_steps") != 3:
         raise LearningPlanError("invalid_step_budget")
+    if (type(plan.get("max_retrieval_attempts_per_subject")) is not int
+            or not 1 <= plan["max_retrieval_attempts_per_subject"] <= 2
+            or type(plan.get("recovery_top_k")) is not int
+            or not 5 <= plan["recovery_top_k"] <= 12):
+        raise LearningPlanError("invalid_retrieval_budget")
     by_id: dict[str, dict[str, Any]] = {}
     for task in tasks:
         if not isinstance(task, dict):

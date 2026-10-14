@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import closing
+import hashlib
 import json
 import os
 import re
@@ -14,6 +15,7 @@ from typing import Any, Sequence
 from reasoning_agent_template.config import AgentConfig
 from reasoning_agent_template.llm import ChatMessage, ChatResult, DeepSeekChatClient, LLMRequestError, MissingApiKeyError
 from reasoning_agent_template.learning_plan import LearningPlanError, build_comparison_plan, ordered_plan_tasks
+from reasoning_agent_template.knowledge import LocalKnowledgeBase, SUPPORTED_EXTENSIONS
 from reasoning_agent_template.models import AgentState, utc_now
 from reasoning_agent_template.multiagent import MultiAgentOrchestrator
 from reasoning_agent_template.risk import classify_evidence_requirement
@@ -32,6 +34,14 @@ BLOCKED_ANSWER = "本轮证据门禁未放行，暂不提供确定结论。请�
 
 class QwenCallLimitError(RuntimeError):
     """The local, persistent model-call allowance is exhausted."""
+
+
+class LearningCorpusChangedError(RuntimeError):
+    """The local source set changed while a bounded evidence plan was running."""
+
+
+class LearningRetrievalTimeoutError(RuntimeError):
+    """A local retrieval attempt timed out; do not infer an answer from partial data."""
 
 
 class BudgetedQwenClient:
@@ -170,6 +180,20 @@ def _explicit_comparison_subjects(question: str) -> tuple[str, str] | None:
     return (left, match.group(2)) if len(left) >= 2 else None
 
 
+def _corpus_fingerprint(root: Path) -> str:
+    """Bind one comparison run to the exact local source bytes it started with."""
+    digest = hashlib.sha256()
+    if not root.exists():
+        return digest.hexdigest()
+    for path in sorted(root.rglob("*")):
+        if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS:
+            digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(path.read_bytes())
+            digest.update(b"\0")
+    return digest.hexdigest()
+
+
 class LearningTemplateCoordinator(TemplateCoordinator):
     """Execute a small evidence plan for explicit two-subject comparisons."""
 
@@ -188,6 +212,12 @@ class LearningTemplateCoordinator(TemplateCoordinator):
             super()._retrieve(state)
             return
         tasks = ordered_plan_tasks(state.execution_plan)
+        knowledge_root = Path(self.config.knowledge["directory"])
+        if not knowledge_root.is_absolute():
+            knowledge_root = self.workspace_root / knowledge_root
+        source_version = _corpus_fingerprint(knowledge_root)
+        state.execution_plan["source_fingerprint"] = source_version
+        primary_top_k = max(1, int(self.config.knowledge.get("top_k", 5)))
         original_goal = state.user_goal
         selected_chunks = {}
         selected_evidence = {}
@@ -209,8 +239,49 @@ class LearningTemplateCoordinator(TemplateCoordinator):
                     })
                     continue
                 state.user_goal = task["query"]
-                super()._retrieve(state)
+                try:
+                    super()._retrieve(state)
+                except TimeoutError as exc:
+                    raise LearningRetrievalTimeoutError("local_retrieval_timeout") from exc
+                if _corpus_fingerprint(knowledge_root) != source_version:
+                    raise LearningCorpusChangedError("knowledge_source_changed")
                 matching = [chunk for chunk in state.retrieval_results if task["subject"] in chunk.text]
+                task["retrieval_attempts"] = [{
+                    "attempt": 1, "top_k": primary_top_k,
+                    "candidate_count": len(state.retrieval_results),
+                    "subject_matches": len(matching),
+                }]
+                if (not matching and len(state.retrieval_results) == primary_top_k
+                        and state.execution_plan["max_retrieval_attempts_per_subject"] == 2
+                        and primary_top_k < state.execution_plan["recovery_top_k"]):
+                    kb = LocalKnowledgeBase(knowledge_root, ledger=self.ledger)
+                    try:
+                        recovered = kb.retrieve(
+                            task["query"], top_k=state.execution_plan["recovery_top_k"],
+                            methods=list(self.config.knowledge["retrieval_methods"]),
+                            min_score=float(self.config.knowledge["min_score"]),
+                        )
+                    except TimeoutError as exc:
+                        raise LearningRetrievalTimeoutError("local_retrieval_timeout") from exc
+                    if _corpus_fingerprint(knowledge_root) != source_version:
+                        raise LearningCorpusChangedError("knowledge_source_changed")
+                    matching = [chunk for chunk in recovered if task["subject"] in chunk.text]
+                    state.retrieval_results = recovered
+                    evidence_by_id = {item.id: item for item in self.ledger.list()}
+                    state.evidence = [evidence_by_id[chunk.evidence_id] for chunk in recovered
+                                      if chunk.evidence_id in evidence_by_id]
+                    state.rag_diagnostics.extend(kb.diagnostics)
+                    task["retrieval_attempts"].append({
+                        "attempt": 2, "top_k": state.execution_plan["recovery_top_k"],
+                        "candidate_count": len(recovered), "subject_matches": len(matching),
+                    })
+                    state.stage_events.append({
+                        "time": utc_now(), "agent": "retriever", "stage": "retrieve",
+                        "kind": "retrieval_recovery_attempted", "task_id": task["id"],
+                        "reason_code": "subject_missing_from_full_top_k",
+                        "top_k": state.execution_plan["recovery_top_k"],
+                        "subject_matches": len(matching),
+                    })
                 task["candidate_evidence_ids"] = [chunk.evidence_id for chunk in matching]
                 task["status"] = "completed" if matching else "missing_subject_source"
                 for chunk in matching:
@@ -232,10 +303,23 @@ class LearningTemplateCoordinator(TemplateCoordinator):
         state.external_results = []
         state.rag_diagnostics = diagnostics
         state.rag_methods = methods
+        if _corpus_fingerprint(knowledge_root) != source_version:
+            raise LearningCorpusChangedError("knowledge_source_changed")
         state.execution_plan["status"] = tasks[-1]["status"]
 
 
 class LearningOrchestrator(MultiAgentOrchestrator):
+    def _before_publish(self, state: AgentState) -> None:
+        self._check_plan_source_version(state)
+
+    def _check_plan_source_version(self, state: AgentState) -> None:
+        if state.execution_plan and state.execution_plan.get("source_fingerprint"):
+            knowledge_root = Path(self.config.knowledge["directory"])
+            if not knowledge_root.is_absolute():
+                knowledge_root = self.workspace_root / knowledge_root
+            if _corpus_fingerprint(knowledge_root) != state.execution_plan["source_fingerprint"]:
+                raise LearningCorpusChangedError("knowledge_source_changed")
+
     def _record_failed_run(
         self, *, run_id: str, started_at: str, error: Exception,
         status_snapshot: dict[str, Any] | None,
@@ -250,7 +334,14 @@ class LearningOrchestrator(MultiAgentOrchestrator):
                 "missing_completion_contract", "missing_retrieval_query",
                 "invalid_comparison_tasks", "invalid_join_task", "missing_dependency",
                 "duplicate_dependency", "invalid_join_dependencies", "cyclic_dependencies",
+                "invalid_retrieval_budget",
             } else "unknown_plan_error"
+        elif isinstance(error, LearningCorpusChangedError):
+            terminal = "precondition_changed"
+            reason = "knowledge_source_changed"
+        elif isinstance(error, LearningRetrievalTimeoutError):
+            terminal = "retrieval_unavailable"
+            reason = "local_retrieval_timeout"
         elif isinstance(error, WorkflowContractError):
             terminal = "handoff_rejected"
             reason = _safe_trace_label(error.code)
@@ -359,6 +450,7 @@ class LearningOrchestrator(MultiAgentOrchestrator):
         return _local_learning_route(route, message), review, events
 
     def _call_deepseek(self, message: str, state: AgentState, *, short_term_memory, long_term_memory):
+        self._check_plan_source_version(state)
         if state.execution_plan and state.execution_plan.get("status") != "completed":
             return (
                 NO_EVIDENCE_ANSWER,

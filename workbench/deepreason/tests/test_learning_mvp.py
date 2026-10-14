@@ -13,7 +13,9 @@ from urllib.error import HTTPError
 from reasoning_agent_template.learning import (
     BudgetedQwenClient,
     LearningAssistant,
+    LearningCorpusChangedError,
     LearningOrchestrator,
+    LearningRetrievalTimeoutError,
     QwenCallLimitError,
     interactive_session,
     main,
@@ -305,6 +307,181 @@ class LearningMvpTests(unittest.TestCase):
             self.assertTrue(task["candidate_evidence_ids"])
             self.assertTrue(any(task["subject"] in chunk["text"] for chunk in answer["rag"]["results"]))
 
+    def test_top_k_omission_gets_one_wider_read_without_lowering_score_floor(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            corpus = root / "knowledge"
+            corpus.mkdir()
+            left = "满二叉树"
+            right = "完全二叉树"
+            (corpus / "left_definition.md").write_text(
+                f"{left}：每个内部结点恰有两个孩子。 "
+                + " ".join(f"filler{i}" for i in range(100)), encoding="utf-8",
+            )
+            (corpus / "right_definition.md").write_text(
+                f"{right}：除末层外均填满，末层从左向右填充。", encoding="utf-8",
+            )
+            for index in range(5):
+                (corpus / f"distractor_{index}.md").write_text(
+                    f"满 二叉树 {index}", encoding="utf-8",
+                )
+            calls = []
+            original_retrieve = LocalKnowledgeBase.retrieve
+
+            def tracked_retrieve(kb, query, **kwargs):
+                results = original_retrieve(kb, query, **kwargs)
+                calls.append((query, kwargs["top_k"], kwargs["min_score"],
+                              sum(query in item.text for item in results)))
+                return results
+
+            client = ScriptedLearningClient()
+            with patch.object(LocalKnowledgeBase, "retrieve", tracked_retrieve):
+                answer = LearningAssistant(root, client=client).ask(
+                    "满二叉树和完全二叉树的定义有什么区别？", thread_id="topk-recovery",
+                )
+            plan = answer["workflow"]["execution_plan"]
+            self.assertEqual(answer["learning"]["decision"], "answered")
+            self.assertEqual(plan["status"], "completed")
+            self.assertEqual([row[1] for row in calls], [4, 12, 4])
+            self.assertEqual([row[3] for row in calls], [0, 1, 1])
+            self.assertEqual([row[2] for row in calls], [0.08] * 3)
+            self.assertEqual(len(plan["tasks"][0]["retrieval_attempts"]), 2)
+            self.assertEqual(len(plan["tasks"][1]["retrieval_attempts"]), 1)
+            self.assertEqual(len([event for event in answer["events"]
+                                  if event.get("kind") == "retrieval_recovery_attempted"]), 1)
+            self.assertEqual(client.calls, ["route", "reviewer", "worker"])
+
+    def test_missing_subject_stops_after_one_wider_read_and_skips_worker(self):
+        calls = []
+        original_retrieve = LocalKnowledgeBase.retrieve
+
+        def tracked_retrieve(kb, query, **kwargs):
+            calls.append((query, kwargs["top_k"]))
+            return original_retrieve(kb, query, **kwargs)
+
+        client = ScriptedLearningClient()
+        with patch.object(LocalKnowledgeBase, "retrieve", tracked_retrieve):
+            answer = LearningAssistant(self.root, client=client).ask(
+                "满二叉树和完全二叉树的定义有什么区别？", thread_id="missing-after-retry",
+            )
+        self.assertEqual(answer["learning"]["decision"], "abstained_incomplete_evidence")
+        self.assertEqual(answer["workflow"]["execution_plan"]["status"], "blocked_missing_subject")
+        self.assertLessEqual(len(calls), 4)
+        self.assertTrue(any(top_k == 12 for _, top_k in calls))
+        self.assertEqual(client.calls, ["route", "reviewer"])
+
+    def test_empty_corpus_does_not_waste_the_top_k_recovery_attempt(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "knowledge").mkdir()
+            client = ScriptedLearningClient()
+            calls = []
+            original_retrieve = LocalKnowledgeBase.retrieve
+
+            def tracked_retrieve(kb, query, **kwargs):
+                calls.append(kwargs["top_k"])
+                return original_retrieve(kb, query, **kwargs)
+
+            with patch.object(LocalKnowledgeBase, "retrieve", tracked_retrieve):
+                answer = LearningAssistant(root, client=client).ask(
+                    "满二叉树和完全二叉树的定义有什么区别？", thread_id="empty-corpus",
+                )
+            self.assertEqual(calls, [4, 4])
+            self.assertEqual(answer["learning"]["decision"], "abstained_incomplete_evidence")
+            self.assertEqual(client.calls, ["route", "reviewer"])
+
+    def test_corpus_change_during_retrieval_stops_before_worker_and_session(self):
+        client = ScriptedLearningClient()
+        original_retrieve = LocalKnowledgeBase.retrieve
+        changed = False
+
+        def changing_retrieve(kb, query, **kwargs):
+            nonlocal changed
+            results = original_retrieve(kb, query, **kwargs)
+            if not changed:
+                changed = True
+                (self.root / "knowledge" / "changed.md").write_text("new premise", encoding="utf-8")
+            return results
+
+        with patch.object(LocalKnowledgeBase, "retrieve", changing_retrieve):
+            with self.assertRaises(LearningCorpusChangedError):
+                LearningAssistant(self.root, client=client).ask(
+                    "满二叉树和完全二叉树的定义有什么区别？", thread_id="changed-corpus",
+                )
+        self.assertEqual(client.calls, ["route", "reviewer"])
+        self.assertFalse((self.root / "sessions" / "changed-corpus" / "snapshot.json").exists())
+        trace, _ = self._failure_trace(self.root)
+        self.assertEqual(trace["terminal_status"], "precondition_changed")
+        self.assertEqual(trace["reason_code"], "knowledge_source_changed")
+
+    def test_corpus_change_after_retrieval_stops_before_worker(self):
+        (self.root / "knowledge" / "08_shape_definitions_test_only.md").write_text(
+            "满二叉树有两个非空孩子。完全二叉树的末层从左向右填充。", encoding="utf-8",
+        )
+        client = ScriptedLearningClient()
+        original_worker = LearningOrchestrator._call_deepseek
+
+        def change_before_worker(orchestrator, message, state, *, short_term_memory, long_term_memory):
+            (self.root / "knowledge" / "08_shape_definitions_test_only.md").write_text(
+                "满二叉树有两个非空孩子。完全二叉树的末层从右向左填充。", encoding="utf-8",
+            )
+            return original_worker(orchestrator, message, state,
+                                   short_term_memory=short_term_memory, long_term_memory=long_term_memory)
+
+        with patch.object(LearningOrchestrator, "_call_deepseek", change_before_worker):
+            with self.assertRaises(LearningCorpusChangedError):
+                LearningAssistant(self.root, client=client).ask(
+                    "满二叉树和完全二叉树的定义有什么区别？", thread_id="changed-before-worker",
+                )
+        self.assertEqual(client.calls, ["route", "reviewer"])
+        self.assertFalse((self.root / "sessions" / "changed-before-worker" / "snapshot.json").exists())
+        self.assertEqual(self._failure_trace(self.root)[0]["terminal_status"], "precondition_changed")
+
+    def test_late_worker_result_is_withheld_if_corpus_changes_while_it_runs(self):
+        source = self.root / "knowledge" / "08_shape_definitions_test_only.md"
+        source.write_text("满二叉树有两个非空孩子。完全二叉树末层从左向右填充。", encoding="utf-8")
+
+        class ChangingWorker(ScriptedLearningClient):
+            def chat(self, messages, *, temperature, max_tokens):
+                result = super().chat(messages, temperature=temperature, max_tokens=max_tokens)
+                if self.calls[-1] == "worker":
+                    source.write_text("满二叉树有两个非空孩子。完全二叉树末层从右向左填充。", encoding="utf-8")
+                return result
+
+        client = ChangingWorker()
+        with self.assertRaises(LearningCorpusChangedError):
+            LearningAssistant(self.root, client=client).ask(
+                "满二叉树和完全二叉树的定义有什么区别？", thread_id="late-worker",
+            )
+        self.assertEqual(client.calls, ["route", "reviewer", "worker"])
+        self.assertFalse((self.root / "sessions" / "late-worker" / "snapshot.json").exists())
+        trace, raw = self._failure_trace(self.root)
+        self.assertEqual(trace["terminal_status"], "precondition_changed")
+        self.assertNotIn("结论取决于问题条件", raw)
+
+    def test_retrieval_timeout_does_not_retry_model_or_publish(self):
+        client = ScriptedLearningClient()
+        calls = []
+        original_retrieve = LocalKnowledgeBase.retrieve
+
+        def timeout_on_recovery(kb, query, **kwargs):
+            calls.append(kwargs["top_k"])
+            if kwargs["top_k"] == 12:
+                raise TimeoutError("private provider detail")
+            return original_retrieve(kb, query, **kwargs)
+
+        with patch.object(LocalKnowledgeBase, "retrieve", timeout_on_recovery):
+            with self.assertRaises(LearningRetrievalTimeoutError):
+                LearningAssistant(self.root, client=client).ask(
+                    "满二叉树和完全二叉树的定义有什么区别？", thread_id="retrieval-timeout",
+                )
+        self.assertEqual(calls, [4, 12])
+        self.assertEqual(client.calls, ["route", "reviewer"])
+        self.assertFalse((self.root / "sessions" / "retrieval-timeout" / "snapshot.json").exists())
+        trace, raw = self._failure_trace(self.root)
+        self.assertEqual(trace["terminal_status"], "retrieval_unavailable")
+        self.assertNotIn("private provider detail", raw)
+
     def test_invalid_comparison_plan_stops_before_retrieval_and_session_save(self):
         def bad_plan(fault):
             plan = build_comparison_plan("满二叉树", "完全二叉树")
@@ -315,6 +492,8 @@ class LearningMvpTests(unittest.TestCase):
                 plan["tasks"][1]["depends_on"] = ["lookup_left"]
             elif fault == "unavailable_handler":
                 plan["tasks"][0]["handler"] = "shell"
+            elif fault == "retrieval_budget":
+                plan["recovery_top_k"] = 1000
             else:
                 plan["max_steps"] = 4
             return plan
@@ -323,6 +502,7 @@ class LearningMvpTests(unittest.TestCase):
             ("missing_dependency", "missing_dependency"),
             ("cycle", "cyclic_dependencies"),
             ("unavailable_handler", "unavailable_handler"),
+            ("retrieval_budget", "invalid_retrieval_budget"),
             ("step_budget", "invalid_step_budget"),
         ):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:

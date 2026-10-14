@@ -7,7 +7,8 @@
 - 在 PowerShell 中连续提问；概念解释走引导路径，条件比较走严格证据与最终审查路径。
 - 从七份带来源的本地课程资料检索。学习场景在 `retrieve → reason` 交付前核对片段、源文件、哈希和 Evidence Ledger；资料不足时止答。
 - 对明确高风险请求增加只升级的路由下限。Gate 未放行或严格题最终审查失败时，扣留草稿，只交付可公开说明。
-- 对少数显式双主体比较题执行三步确定性证据计划：分别查询两个主体并汇合候选；缺一侧资料时跳过 Worker。任务 ID、依赖、处理器和步数在检索前检查。
+- 对少数显式双主体比较题执行三步确定性证据计划：分别查询两个主体并汇合候选；若前四条候选排满却缺主体，最多扩大一次 Top-K，仍缺资料就跳过 Worker。任务 ID、依赖、处理器、步数与检索预算在运行前检查；源文件中途变化会阻断发布。
+- 坏计划、交付契约失败与模型不可用会留下脱敏的本地失败终态；失败文件不包含问题或模型正文，也不等于自动续跑。
 - 按 thread 恢复近期会话；本机 SQLite 在发送真实千问请求前预占名额，默认总上限为 100 次。
 
 上述能力的归属及限制见[改动清单](workbench/PROVENANCE.md)和[项目状态](docs/PROJECT_STATUS.md)；下一阶段按[开发路径](docs/DEVELOPMENT_PATH.md)推进。上游的工作流、检索器和 SessionStore 是复用代码；本项目的学习场景、交付检查、发布保护及评测由维护者与 AI 协作完成。
@@ -33,7 +34,7 @@ py -3.12 -m venv .venv
 
 ## 验证与边界
 
-最简单的离线验收是在仓库根目录运行 `.\.venv\Scripts\python.exe scripts\verify_learning_paths.py`；七类代表性终态、路径覆盖口径、预期结果与本次实测见[最小闭环测试报告](docs/MVP_TEST_REPORT.md)。
+最简单的离线验收是在仓库根目录运行 `.\.venv\Scripts\python.exe scripts\verify_learning_paths.py`；七类代表性终态加一类有限补查案例、路径覆盖口径、预期结果与本次实测见[最小闭环测试报告](docs/MVP_TEST_REPORT.md)。运行 `.\.venv\Scripts\python.exe scripts\eval_bounded_recovery.py` 可复现相同初态下检索预算 1 次与 2 次的三组开关对照。
 
 在 `workbench/deepreason` 目录运行离线测试：
 
@@ -42,7 +43,7 @@ $env:PYTHONPATH='src'
 ..\..\.venv\Scripts\python.exe -m unittest discover -s tests -q
 ```
 
-最近一次完整回归及已观察的失败记录见[项目状态](docs/PROJECT_STATUS.md)。评测题与无模型诊断器分别位于 `workbench/deepreason/evals/` 和 `scripts/eval_learning_baseline.py`。当前的“语义”检索是轻量词项相似度，“Graph”是词项共现；没有 Embedding、实体多跳图谱或经过测量的全局答案准确率。比较题的计划仅支持三个确定性任务，普通题 Planner 仍是固定文字步骤；只有一条工作流边接入运行时交付契约，名为 `verify` 的上游节点也不核验 Worker 的最终答案。
+最近一次完整回归及已观察的失败记录见[项目状态](docs/PROJECT_STATUS.md)。评测题与无模型诊断器分别位于 `workbench/deepreason/evals/` 和 `scripts/eval_learning_baseline.py`。当前的“语义”检索是轻量词项相似度，“Graph”是词项共现；没有 Embedding、实体多跳图谱或经过测量的全局答案准确率。比较题的计划仅支持三个确定性任务及一次有界本地补查，普通题 Planner 仍是固定文字步骤；只有一条工作流边接入运行时交付契约，名为 `verify` 的上游节点也不核验 Worker 的最终答案。
 
 ## 来源
 

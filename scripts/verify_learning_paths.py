@@ -16,6 +16,7 @@ sys.path.insert(0, str(WORKBENCH / "src"))
 sys.path.insert(0, str(WORKBENCH))
 
 from reasoning_agent_template.learning import LearningAssistant  # noqa: E402
+from reasoning_agent_template.knowledge import LocalKnowledgeBase  # noqa: E402
 from reasoning_agent_template.workflow import TemplateCoordinator, WorkflowContractError  # noqa: E402
 from tests.test_learning_mvp import ScriptedLearningClient  # noqa: E402
 
@@ -137,11 +138,66 @@ def _invalid_handoff(parent: Path) -> dict:
     }
 
 
+def _top_k_recovery(parent: Path) -> dict:
+    case_id = "top_k_recovery"
+    workspace = parent / case_id
+    corpus = workspace / "knowledge"
+    corpus.mkdir(parents=True)
+    left, right = "满二叉树", "完全二叉树"
+    (corpus / "left_definition.md").write_text(
+        f"{left}：每个内部结点恰有两个孩子。 "
+        + " ".join(f"filler{i}" for i in range(100)), encoding="utf-8",
+    )
+    (corpus / "right_definition.md").write_text(
+        f"{right}：除末层外均填满，末层从左向右填充。", encoding="utf-8",
+    )
+    for index in range(5):
+        (corpus / f"distractor_{index}.md").write_text(f"满 二叉树 {index}", encoding="utf-8")
+    attempts = []
+    original_retrieve = LocalKnowledgeBase.retrieve
+
+    def tracked_retrieve(kb, query, **kwargs):
+        results = original_retrieve(kb, query, **kwargs)
+        attempts.append({"query": query, "top_k": kwargs["top_k"],
+                         "min_score": kwargs["min_score"],
+                         "subject_matches": sum(query in item.text for item in results)})
+        return results
+
+    client = ScriptedLearningClient()
+    with patch.object(LocalKnowledgeBase, "retrieve", tracked_retrieve):
+        payload = LearningAssistant(workspace, client=client).ask(
+            "满二叉树和完全二叉树的定义有什么区别？", thread_id=case_id,
+        )
+    plan = payload["workflow"]["execution_plan"]
+    _check_equal(case_id, "decision", payload["learning"]["decision"], "answered")
+    _check_equal(case_id, "plan status", plan["status"], "completed")
+    _check_equal(case_id, "top-k attempts", [item["top_k"] for item in attempts], [4, 12, 4])
+    _check_equal(case_id, "subject matches", [item["subject_matches"] for item in attempts], [0, 1, 1])
+    _check_equal(case_id, "score floors", [item["min_score"] for item in attempts], [0.08] * 3)
+    _check_equal(case_id, "model calls", client.calls, ["route", "reviewer", "worker"])
+    _check_equal(case_id, "failure files", len(list((workspace / "local_state" / "failures").glob("*.json"))), 0)
+    return {
+        "case": case_id,
+        "expected_result": "answered_after_one_wider_read",
+        "observed_result": "answered_after_one_wider_read",
+        "path": "bounded_retrieval_recovery",
+        "gate": payload["gates"]["decisions"][-1]["status"],
+        "release": payload["output_release"]["status"],
+        "model_calls": client.calls,
+        "qualified_evidence_count": len(payload["evidence"]["qualified_evidence_ids"]),
+        "stage_trace": payload["state_machine"]["trace"],
+        "session_saved": (workspace / "sessions" / case_id / "snapshot.json").exists(),
+        "retrieval_attempts": attempts,
+        "passed": True,
+    }
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="deepreason-mvp-acceptance-") as temp:
         parent = Path(temp)
         rows = [_ordinary_case(parent, spec) for spec in CASES]
         rows.append(_invalid_handoff(parent))
+        rows.append(_top_k_recovery(parent))
     spec = json.loads((WORKBENCH / "learning_mvp" / "configs" / "workflows" /
                        "learning.workflow.json").read_text(encoding="utf-8"))
     declared = {(edge["from"], edge["to"]): edge["id"] for edge in spec["edges"]}
@@ -152,7 +208,7 @@ def main() -> int:
     }
     report = {
         "kind": "offline_scripted_mvp_acceptance",
-        "scope": "Seven selected terminal outcome families, not exhaustive control-flow coverage",
+        "scope": "Seven selected terminal outcomes plus one bounded retrieval recovery; not exhaustive control-flow coverage",
         "passed": sum(row["passed"] for row in rows),
         "total": len(rows),
         "real_qwen_calls": 0,
