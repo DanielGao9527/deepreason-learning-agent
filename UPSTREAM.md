@@ -26,7 +26,7 @@ S0 当时仅抽取上述文件，没有复制密钥或完整平台。保留原�
 
 2026-09-25 已在本机获取 `references/deepreason-full`，检出固定提交，保留全部 142 个受版本管理文件：原代码、文档、配置、前端、测试和作者公开示例。来源与逐文件 SHA-256 见 `references/UPSTREAM_SNAPSHOT.json`。完整原样快照不随本公开仓库发布；可从上方固定提交重新获取。公开仓库中的 `workbench/deepreason/` 是已修改的工作副本。
 
-便携包保留完整受版本管理快照，不含 .git 历史。作者 evidence/knowledge 示例不是用户个人记录或本地新实验。lab 新增和修改仍位于 src/tests，完整上游存在不表示这些模块已接入 lab。
+早期本机交接包曾保存原样快照；交接包和其中的运行数据不随本公开仓库发布。现行学习助手的改造位于 `workbench/deepreason/`，逐项归属见 `workbench/PROVENANCE.md`；根目录早期辅助样例也未发布。上游作者的示例 `knowledge/` 文件不是用户个人记录。
 
 ## S0 本地新增
 
