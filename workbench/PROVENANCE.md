@@ -99,3 +99,11 @@
 - `tests/test_learning_mvp.py` 与 lab 的三份离线脚本：完整正例、supported 但缺清单、重复/伪造摘录、缺项、标未覆盖和旧回执，均通过实际 Worker→审查→发布→会话路径验证；离线路径增加一例扣稿反例。
 
 完整副本 **189/189**，九类学习路径 **9/9**，七组 Skill 配对 **7/7**，真实千问 0。契约核验结构与本轮版本，不证明语义正确；来源及讲解见 lab 的 `docs/lessons/LEARNING_23_STRICT_ANSWER_COVERAGE_CONTRACT.md`。
+
+第二十四课新增**有界配对质量/代价实验与内容绑定人工评分**，固定上游和正式问答策略未改：
+
+- src/reasoning_agent_template/learning_experiment.py：本项目与 AI 协作新增底层调用尝试计量、本轮请求上限、不可重试错误封闭、模型标签一致性、usage 白名单与缺失标记；人工复核包隐藏版本标签，并用实验/答案/证据哈希阻止旧评分误用。
+- lab 的 scripts/run_learning_experiment.py：复用现有 LearningAssistant、Qwen SQLite 全库预占、笔记与 Skill 审批，固定三组题的语料、Workflow、代码指纹和新会话；默认计划、显式离线或千问执行，失败实验不生成质量对照。真实千问模式尚未实测。
+- tests/test_learning_experiment.py：17 项针对性测试；完整副本 206/206。正常离线 16 次（route 6、reviewer 6、worker 4）且 Skill 加载 1 次，限额 2 时只转交 2 次、拒绝第三次。六份答复未独立评分，token 与真实效果未测，千问调用 0。
+
+课程及评分方法见 lab 的 docs/lessons/LEARNING_24_PAIRED_QUALITY_AND_COST_EXPERIMENT.md；未把模拟评分或未知 usage 写成真实收益。

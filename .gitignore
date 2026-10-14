@@ -34,6 +34,7 @@ handoff/
 !/scripts/eval_learning_skill_candidate.py
 !/scripts/replay_learning_skill_paths.py
 !/scripts/eval_learning_answers.py
+!/scripts/run_learning_experiment.py
 
 # Upstream authoring instructions and mutable evidence stay local.
 /workbench/deepreason/.opencode/

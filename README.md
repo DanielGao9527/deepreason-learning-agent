@@ -43,6 +43,8 @@ py -3.12 -m venv .venv
 
 答案级离线诊断可运行 `.\.venv\Scripts\python.exe scripts\eval_learning_answers.py`。六题区分合格资料是否出现、答复字面要点是否覆盖及严格题是否扣稿；标签未经独立人工复核，字面检查不是语义准确率。缺口与发布契约分别见[第二十二课](docs/lessons/LEARNING_22_ANSWER_QUALITY_PROBE.md)、[第二十三课](docs/lessons/LEARNING_23_STRICT_ANSWER_COVERAGE_CONTRACT.md)。
 
+三组 Skill 答案/代价对照入口为 `.\.venv\Scripts\python.exe scripts\run_learning_experiment.py`，默认只显示计划；加 `--offline` 才执行脚本实验，并在 `artifacts/experiments/` 留下六份隐藏版本标签的答复复核包与待填评分表。逐次记录角色、失败、token 与耗时，缺 usage 或人工评分时保持未测。真实千问必须显式加 `--qwen`，另有本轮请求限额；接线已离线验证，真实入口尚未实测。内容绑定评分与使用方法见[第二十四课](docs/lessons/LEARNING_24_PAIRED_QUALITY_AND_COST_EXPERIMENT.md)。
+
 ## 验证与边界
 
 最简单的离线验收是在仓库根目录运行 `.\.venv\Scripts\python.exe scripts\verify_learning_paths.py`；当前九例含严格题完整答案发布与覆盖清单缺失扣稿对照，路径覆盖口径、预期结果与实测见[最小闭环测试报告](docs/MVP_TEST_REPORT.md)。运行 `.\.venv\Scripts\python.exe scripts\eval_bounded_recovery.py` 可复现相同初态下检索预算 1 次与 2 次的三组开关对照。
