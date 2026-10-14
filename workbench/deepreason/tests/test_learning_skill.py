@@ -122,6 +122,8 @@ class LearningSkillTests(unittest.TestCase):
         applied = self.skills.approve(first["candidate_id"], expected_hash=first["content_hash"],
                                       approved_by="explicit-local-command")
         self.assertEqual(applied["version"], 1)
+        self.assertEqual(applied["gate_decision"]["status"], "allow")
+        self.assertEqual(applied["gate_decision"]["required_evidence"], [first["source_note_id"]])
         self.assertEqual(LearningSkillStore(self.root).active()["content_hash"], first["content_hash"])
         with self.assertRaisesRegex(LearningSkillError, "base_version_changed"):
             self.skills.approve(stale["candidate_id"], expected_hash=stale["content_hash"], approved_by="local")
@@ -130,6 +132,7 @@ class LearningSkillTests(unittest.TestCase):
         rolled_back = self.skills.rollback(0, expected_current_hash=first["content_hash"],
                                            approved_by="explicit-local-command")
         self.assertEqual(rolled_back["version"], 0)
+        self.assertEqual(rolled_back["gate_decision"]["status"], "allow")
         self.assertEqual(LearningSkillStore(self.root).active()["version"], 0)
 
     def test_only_approved_comparison_with_evidence_changes_worker_system_prompt(self):

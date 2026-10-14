@@ -10,8 +10,9 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
+from reasoning_agent_template.gates import GatePolicy
 from reasoning_agent_template.learning_notes import LearningNoteStore
-from reasoning_agent_template.models import utc_now
+from reasoning_agent_template.models import EvidenceItem, utc_now
 
 
 SKILL_ID = "comparison-preconditions"
@@ -170,6 +171,21 @@ class LearningSkillStore:
                            if note["note_id"] == row[6]), None)
             if source is None or hashlib.sha256(source["body"].encode("utf-8")).hexdigest() != row[7]:
                 raise LearningSkillError("candidate_source_changed")
+            gate = GatePolicy(
+                workspace_root=self.workspace_root,
+                min_evidence_by_risk={"medium": 1},
+                approval_required_actions={"update_skill"},
+            ).evaluate(
+                action="update_skill", risk_level="medium",
+                evidence=[EvidenceItem(
+                    id=row[6], source_type="explicit_learning_feedback", uri="local://learning-note",
+                    locator=row[8], content_hash=row[7], summary="explicit comparison feedback",
+                    confidence=1.0, collected_at=source["created_at"],
+                )],
+                target_path=self.path, approved_by=approved_by,
+            )
+            if gate.status != "allow":
+                raise LearningSkillError("skill_update_gate_rejected")
             evaluation = json.loads(row[4])
             active = self._active(db)
             if active["content_hash"] != row[0]:
@@ -184,7 +200,8 @@ class LearningSkillStore:
             db.execute("UPDATE state SET active_version=? WHERE id=1", (version,))
             db.execute("UPDATE candidates SET status='applied' WHERE candidate_id=?", (candidate_id,))
             db.commit()
-        return {"status": "applied", "version": version, "content_hash": row[1]}
+        return {"status": "applied", "version": version, "content_hash": row[1],
+                "gate_decision": gate.to_dict()}
 
     def rollback(self, target_version: int, *, expected_current_hash: str,
                  approved_by: str | None) -> dict[str, Any]:
@@ -208,8 +225,18 @@ class LearningSkillStore:
                 valid_target = _content_hash(target[1], target[2]) == target[0]
             if not valid_target:
                 raise LearningSkillError("target_content_hash_mismatch")
+            gate = GatePolicy(
+                workspace_root=self.workspace_root,
+                approval_required_actions={"update_skill"},
+            ).evaluate(
+                action="update_skill", risk_level="none", evidence=[],
+                target_path=self.path, approved_by=approved_by,
+            )
+            if gate.status != "allow":
+                raise LearningSkillError("skill_rollback_gate_rejected")
             db.execute("UPDATE state SET active_version=? WHERE id=1", (target_version,))
             db.execute("INSERT INTO rollbacks VALUES (?, ?, ?, ?, ?)",
                        (uuid.uuid4().hex, current["version"], target_version, approved_by.strip(), utc_now()))
             db.commit()
-        return {"status": "rolled_back", "version": target_version, "content_hash": target[0]}
+        return {"status": "rolled_back", "version": target_version, "content_hash": target[0],
+                "gate_decision": gate.to_dict()}
