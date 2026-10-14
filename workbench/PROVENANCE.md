@@ -84,3 +84,10 @@
 - 结果是 **7/7** 配对终态符合预期、意外控制流变化 **0/7**、目标 Worker 提示加载 **1/7**、脚本模型调用差 **0**；真实千问 0。这是控制流回归，不是答案语义正确率或性能提升。
 
 原理、复现和局限见 lab 的 `docs/lessons/LEARNING_21_PAIRED_REPLAY_BOUNDARIES.md`。
+
+第二十二课新增**离线答案诊断**，固定上游与正式学习运行策略未改：
+
+- `src/reasoning_agent_template/answer_eval.py`、`evals/learning_answer_probe_v1.json`：本项目与 AI 协作新增小型题目要点和分层归因器，分别看预期终态、合格检索片段中的资料锚点及答案字面要点。标注未经过独立人工复核，字面匹配不是语义验证。
+- lab 的 `scripts/eval_learning_answers.py`、`tests/test_learning_answer_probe.py`：用真实工作流和固定脚本模型跑新会话，保存逐题证据与结论；校准测试特意展示“关键词齐全但含义颠倒”仍会误过代理检查。
+
+六题终态 6/6，四题合格资料锚点 4/4，但脚本答案字面要点 0/4；两题按预期止答 2/2。此结果暴露当前固定脚本答案的教学内容缺口，**不是千问准确率，也不是 Skill 前后收益**。本课真实千问调用 0。详见 lab 的 `docs/lessons/LEARNING_22_ANSWER_QUALITY_PROBE.md`。

@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "label_status": "AI-assisted source-derived rubric; independent human review pending",
+  "scope": "Fixed seven-document local corpus. Literal answer facets are diagnostic proxies, not semantic correctness.",
+  "frozen_corpus_sha256": "36b913d8c5186a6bb6205ad1a27feee9033f896501a6a98066449c45fc8c8cc0",
+  "cases": [
+    {
+      "id": "hash_collision",
+      "question": "什么是哈希冲突？",
+      "expected_decision": "answered",
+      "source_anchors": [{"file": "01_hash_table.md", "contains": "两个不同的键映射到同一槽位，称为哈希冲突"}],
+      "answer_facets": [
+        {"id": "distinct_keys", "any_of": ["两个不同的键", "不同的键"]},
+        {"id": "same_slot", "any_of": ["同一槽位", "相同槽位"]},
+        {"id": "collision", "any_of": ["哈希冲突", "冲突"]}
+      ]
+    },
+    {
+      "id": "binary_tree_definition",
+      "question": "二叉树是什么？",
+      "expected_decision": "answered",
+      "source_anchors": [{"file": "07_binary_tree_definition.md", "contains": "一个结点最多有两个非空孩子，左、右位置有区别"}],
+      "answer_facets": [
+        {"id": "two_children", "any_of": ["最多有两个", "至多两个"]},
+        {"id": "left_right", "any_of": ["左子树", "左右子树"]},
+        {"id": "tree", "any_of": ["二叉树"]}
+      ]
+    },
+    {
+      "id": "hash_tree_range",
+      "question": "哈希表和二叉搜索树有什么区别？",
+      "expected_decision": "answered",
+      "source_anchors": [{"file": "03_choice_conditions.md", "contains": "如果任务要求按键排序、顺序遍历或范围查询，树形索引往往更合适"}],
+      "answer_facets": [
+        {"id": "hash_lookup", "any_of": ["哈希表", "哈希索引"]},
+        {"id": "tree_order", "any_of": ["二叉搜索树", "树形索引"]},
+        {"id": "range", "any_of": ["范围查询", "范围查找"]},
+        {"id": "condition", "any_of": ["取决于", "如果", "需要"]}
+      ]
+    },
+    {
+      "id": "strict_speed_claim",
+      "question": "哈希表一定比平衡二叉搜索树快吗？比较精确查找和范围查询。",
+      "expected_decision": "answered",
+      "source_anchors": [{"file": "03_choice_conditions.md", "contains": "至少要区分精确查找与范围查询、平均表现与最坏情况"}],
+      "answer_facets": [
+        {"id": "no_absolute", "any_of": ["不一定", "没有脱离场景的统一答案"]},
+        {"id": "exact", "any_of": ["精确查找"]},
+        {"id": "range", "any_of": ["范围查询"]},
+        {"id": "balance", "any_of": ["平衡树", "平衡二叉搜索树"]},
+        {"id": "average_worst", "any_of": ["最坏情况", "最坏表现"]}
+      ]
+    },
+    {
+      "id": "missing_comparison",
+      "question": "满二叉树和完全二叉树的定义有什么区别？",
+      "expected_decision": "abstained_incomplete_evidence",
+      "source_anchors": [],
+      "answer_facets": []
+    },
+    {
+      "id": "outside_corpus",
+      "question": "请解释 ZxqvPrime-99 的内部缓存协议。",
+      "expected_decision": "abstained_no_evidence",
+      "source_anchors": [],
+      "answer_facets": []
+    }
+  ]
+}
