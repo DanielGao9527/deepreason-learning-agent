@@ -61,3 +61,11 @@
 学习场景 **30/30**、完整副本 **157/157**、八例验收 **8/8**；真实千问 **0**，本机预占 **14/100**。唯一得到恢复的夹具从止答变回答，额外本地检索一次、额外脚本模型 Worker 一次；不能当作答案准确率或性能提升。恢复仍局限于显式双主体比较题和 Top-K 截断，不是通用任务恢复、语义查询重写或跨进程事务。详见 lab 的 `docs/lessons/LEARNING_18_BOUNDED_RETRIEVAL_RECOVERY.md`。
 
 历史记录：第十五课后完整工作副本第二次回归 **142 项通过**（固定上游 118 项 + 当时新增 24 项）；第一次一项旧 Web 状态测试超出固定一秒窗口，单测和再次完整回归均通过。当时没有真实千问请求，计数为 **12/100**。双语别名未部署；契约失败不会继续 Worker 或保存会话，但检索已可能写 Ledger，失败轨迹也尚未持久化。通用上游配置的单产物评审仍默认关闭，学习助手只在严格题启用；上游 `verify` 节点不做 Worker 答案核验。真实语义准确率、额外 token/延迟及一次修订尚未测量/实现。完整测试会修改工作副本内的示例 `evidence/ledger.jsonl`；后续重测应恢复它，保持差异清晰。
+
+第十九课把上游独立 Tool Runtime 用于明确学习笔记动作，固定上游未改：
+
+- `src/reasoning_agent_template/runtime.py`：复用原有工具注册、Schema、Gate、路径限制与超时框架；本项目加固定目标路径、额外字段拒绝、只读最多一次超时重试，以及写超时/未知异常后的匹配回执核对。回执不确定时停止自动重试。上游其他工具的进程内去重仍不具持久保证。
+- `src/reasoning_agent_template/learning_notes.py`：本项目与 AI 协作新增本地学习笔记读写。SQLite 事务把 `(thread_id, operation_id)` 的唯一笔记、版本与回执同时提交；同 ID 换正文、旧版本和并发竞争不会产生第二条笔记。回执核对同时比较正文与哈希。
+- `src/reasoning_agent_template/learning.py`、`tests/test_learning_notes.py`：增加显式命令行读、写、查回执和离线故障注入；命令适配使用确定性模型桩走上游 Runtime，普通学习问答**没有**自动 tool calling。`.gitignore` 忽略本地笔记库；不把个人笔记加入仓库。
+
+针对性测试与完整回归的最终结果见 lab 的 `docs/lessons/LEARNING_19_TOOL_EXECUTION_ASSURANCE.md`。这是一种**单场景适配**，不能写成通用 MCP 工具层、任意写工具持久幂等或完整长期记忆。

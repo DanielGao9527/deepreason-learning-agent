@@ -51,9 +51,14 @@ class RuntimeTool:
     risk_level: str = "low"
     input_schema: dict[str, Any] = field(default_factory=dict)
     target_path_argument: str | None = None
+    fixed_target_path: Path | None = None
     approved_by: str | None = None
     timeout_seconds: float | None = None
     idempotency_key_argument: str | None = None
+    may_write: bool = False
+    receipt_lookup: Callable[[dict[str, Any]], Any | None] | None = None
+    definitive_exceptions: tuple[type[Exception], ...] = ()
+    max_read_retries: int = 0
 
     def to_model_schema(self) -> dict[str, Any]:
         return {
@@ -63,6 +68,8 @@ class RuntimeTool:
         }
 
     def target_path(self, arguments: dict[str, Any]) -> Path | None:
+        if self.fixed_target_path is not None:
+            return self.fixed_target_path
         if not self.target_path_argument:
             return None
         value = arguments.get(self.target_path_argument)
@@ -275,8 +282,8 @@ class AgentRuntime:
                     output = content
                 else:
                     try:
-                        output = _invoke_tool(tool, dict(tool_call.arguments))
-                    except FutureTimeoutError:
+                        output = _invoke_with_read_retry(tool, dict(tool_call.arguments), events)
+                    except (FutureTimeoutError, TimeoutError):
                         events.append(
                             {
                                 "time": utc_now(),
@@ -285,31 +292,56 @@ class AgentRuntime:
                                 "timeout_seconds": tool.timeout_seconds,
                             }
                         )
-                        return self._result(
-                            status="failed",
-                            answer=f"Tool timed out: {tool.name}",
-                            messages=messages,
-                            events=events,
-                            gate_decisions=gate_decisions,
-                            tool_steps=tool_steps,
-                        )
+                        if tool.may_write:
+                            output = _lookup_receipt(tool, tool_call.arguments)
+                            if output is None:
+                                events.append({"time": utc_now(), "kind": "tool_outcome_uncertain", "tool": tool.name})
+                                return self._result(
+                                    status="uncertain",
+                                    answer=f"Tool outcome uncertain: {tool.name}; check its receipt before retrying",
+                                    messages=messages, events=events,
+                                    gate_decisions=gate_decisions, tool_steps=tool_steps,
+                                )
+                            events.append({"time": utc_now(), "kind": "tool_result_reconciled", "tool": tool.name})
+                        else:
+                            return self._result(
+                                status="failed",
+                                answer=f"Tool timed out: {tool.name}",
+                                messages=messages,
+                                events=events,
+                                gate_decisions=gate_decisions,
+                                tool_steps=tool_steps,
+                            )
                     except Exception as exc:
-                        events.append(
-                            {
-                                "time": utc_now(),
-                                "kind": "tool_failed",
-                                "tool": tool.name,
-                                "error": str(exc),
-                            }
-                        )
-                        return self._result(
-                            status="failed",
-                            answer=str(exc),
-                            messages=messages,
-                            events=events,
-                            gate_decisions=gate_decisions,
-                            tool_steps=tool_steps,
-                        )
+                        if tool.may_write and not isinstance(exc, tool.definitive_exceptions):
+                            output = _lookup_receipt(tool, tool_call.arguments)
+                            if output is None:
+                                events.append({"time": utc_now(), "kind": "tool_outcome_uncertain", "tool": tool.name,
+                                               "error_type": type(exc).__name__})
+                                return self._result(
+                                    status="uncertain",
+                                    answer=f"Tool outcome uncertain: {tool.name}; check its receipt before retrying",
+                                    messages=messages, events=events,
+                                    gate_decisions=gate_decisions, tool_steps=tool_steps,
+                                )
+                            events.append({"time": utc_now(), "kind": "tool_result_reconciled", "tool": tool.name})
+                        else:
+                            events.append(
+                                {
+                                    "time": utc_now(),
+                                    "kind": "tool_failed",
+                                    "tool": tool.name,
+                                    "error": str(exc),
+                                }
+                            )
+                            return self._result(
+                                status="failed",
+                                answer=str(exc),
+                                messages=messages,
+                                events=events,
+                                gate_decisions=gate_decisions,
+                                tool_steps=tool_steps,
+                            )
                     content = _stringify_tool_result(output)
                     if idempotency_key:
                         self._idempotency_results[idempotency_key] = content
@@ -401,6 +433,30 @@ def _stringify_tool_result(value: Any) -> str:
         return str(value)
 
 
+def _lookup_receipt(tool: RuntimeTool, arguments: dict[str, Any]) -> Any | None:
+    if tool.receipt_lookup is None:
+        return None
+    try:
+        return tool.receipt_lookup(dict(arguments))
+    except Exception:
+        return None
+
+
+def _invoke_with_read_retry(
+    tool: RuntimeTool, arguments: dict[str, Any], events: list[dict[str, Any]],
+) -> Any:
+    retries = 0 if tool.may_write else max(0, min(1, int(tool.max_read_retries)))
+    for attempt in range(retries + 1):
+        try:
+            return _invoke_tool(tool, arguments)
+        except (FutureTimeoutError, TimeoutError):
+            if attempt >= retries:
+                raise
+            events.append({"time": utc_now(), "kind": "tool_read_retry", "tool": tool.name,
+                           "attempt": attempt + 2})
+    raise AssertionError("unreachable retry state")
+
+
 def _invoke_tool(tool: RuntimeTool, arguments: dict[str, Any]) -> Any:
     if tool.timeout_seconds is None:
         return tool.action(arguments)
@@ -421,6 +477,10 @@ def _validate_tool_arguments(schema: dict[str, Any], arguments: dict[str, Any]) 
     for name in schema.get("required", []):
         if name not in arguments:
             errors.append(f"missing required field: {name}")
+    if schema.get("additionalProperties") is False:
+        for name in arguments:
+            if name not in schema.get("properties", {}):
+                errors.append(f"unexpected field: {name}")
     for name, property_schema in dict(schema.get("properties", {})).items():
         if name not in arguments or not isinstance(property_schema, dict):
             continue

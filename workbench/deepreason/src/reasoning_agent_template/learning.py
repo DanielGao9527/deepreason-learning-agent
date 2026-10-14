@@ -15,6 +15,7 @@ from typing import Any, Sequence
 from reasoning_agent_template.config import AgentConfig
 from reasoning_agent_template.llm import ChatMessage, ChatResult, DeepSeekChatClient, LLMRequestError, MissingApiKeyError
 from reasoning_agent_template.learning_plan import LearningPlanError, build_comparison_plan, ordered_plan_tasks
+from reasoning_agent_template.learning_notes import LearningNoteStore, execute_learning_note_command
 from reasoning_agent_template.knowledge import LocalKnowledgeBase, SUPPORTED_EXTENSIONS
 from reasoning_agent_template.models import AgentState, utc_now
 from reasoning_agent_template.multiagent import MultiAgentOrchestrator
@@ -556,9 +557,46 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--usage", action="store_true", help="只查看本机千问调用次数，不发送请求")
     parser.add_argument("--interactive", action="store_true", help="在同一 thread 中连续提问")
+    note_action = parser.add_mutually_exclusive_group()
+    note_action.add_argument("--notes", action="store_true", help="查看当前 thread 的本地学习笔记，不调用模型")
+    note_action.add_argument("--save-note", help="明确保存一条本地学习笔记，不调用模型")
+    note_action.add_argument("--note-receipt", help="按操作 ID 核对笔记写入回执，不调用模型")
+    parser.add_argument("--operation-id", help="笔记写入的幂等操作 ID；重试必须使用同一个 ID")
+    parser.add_argument("--expected-version", type=int, help="保存笔记时预期的 thread 版本")
     args = parser.parse_args(argv)
     if args.usage:
         print(f"千问调用：{BudgetedQwenClient.calls_used_at(USAGE_DB)}/{MAX_QWEN_CALLS}")
+        return 0
+    if (args.operation_id is not None or args.expected_version is not None) and args.save_note is None:
+        parser.error("--operation-id 和 --expected-version 只能配合 --save-note 使用。")
+    if args.notes or args.save_note is not None or args.note_receipt is not None:
+        if args.question or args.interactive or args.json:
+            parser.error("笔记命令不能与问答、--interactive 或 --json 同用。")
+        store = LearningNoteStore(args.workspace)
+        if args.note_receipt is not None:
+            try:
+                print(json.dumps(store.receipt(args.thread, args.note_receipt) or {"status": "not_found"}, ensure_ascii=False))
+                return 0
+            except ValueError as exc:
+                print(f"笔记操作未完成：{exc}")
+                return 2
+        if args.save_note is not None:
+            if args.operation_id is None or args.expected_version is None:
+                parser.error("--save-note 需要 --operation-id 和 --expected-version。")
+            tool_name = "save_learning_note"
+            arguments = {"thread_id": args.thread, "operation_id": args.operation_id,
+                         "body": args.save_note, "expected_version": args.expected_version}
+        else:
+            tool_name = "list_learning_notes"
+            arguments = {"thread_id": args.thread}
+        result = execute_learning_note_command(
+            store, tool_name, arguments, user_confirmed=args.save_note is not None,
+        )
+        if result.status != "completed":
+            print(f"笔记操作未完成：{result.status}。{result.answer}")
+            return 4 if result.status == "uncertain" else 2
+        tool_result = next(message["content"] for message in reversed(result.messages) if message["role"] == "tool")
+        print(tool_result)
         return 0
     if args.interactive:
         if args.question or args.json:

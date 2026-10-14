@@ -9,6 +9,7 @@ server.*.log
 logs/
 sessions/
 learning_mvp/local_state/
+local_state/
 learning_mvp/sessions/
 learning_mvp/evidence/
 learning_mvp/memory/
