@@ -20,7 +20,7 @@ from reasoning_agent_template.learning import LearningAssistant  # noqa: E402
 from reasoning_agent_template.learning_notes import LearningNoteStore  # noqa: E402
 from reasoning_agent_template.learning_skill import LearningSkillStore  # noqa: E402
 from reasoning_agent_template.workflow import TemplateCoordinator, WorkflowContractError  # noqa: E402
-from tests.test_learning_mvp import ScriptedLearningClient  # noqa: E402
+from tests.test_learning_mvp import ReviewedLearningClient  # noqa: E402
 
 
 FROZEN_BASE_CORPUS_SHA256 = "36b913d8c5186a6bb6205ad1a27feee9033f896501a6a98066449c45fc8c8cc0"
@@ -38,7 +38,7 @@ CASES = (
 )
 
 
-class CapturingClient(ScriptedLearningClient):
+class CapturingClient(ReviewedLearningClient):
     def __init__(self):
         super().__init__()
         self.worker_skill_loaded = False

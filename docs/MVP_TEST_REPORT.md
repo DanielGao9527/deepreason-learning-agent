@@ -1,6 +1,6 @@
 # 最小运行闭环与测试报告
 
-更新：2026-10-15。对象是 `workbench/deepreason/` 中的学习助手。**最新完整回归 229/229，十例离线入口 10/10；真实千问验收仍待通过。** 第 1–4 节保留 2026-10-14 初始基线，第 5–16 节按时间记录后续修订；当前边界见[项目状态](PROJECT_STATUS.md)，最新路由复核修复见第 16 节。脚本模型、真实千问和完整回归分别记账。
+更新：2026-10-15。对象是 `workbench/deepreason/` 中的学习助手。**最新完整回归 239/239，十一例离线入口 11/11；真实千问验收仍待通过。** 第 1–4 节保留初始基线，后续按时间追加修订；最新普通答案发布保护见第 17 节。脚本模型、真实千问和完整回归分别记账。
 
 ## 1. 现在的最小运行闭环
 
@@ -11,11 +11,11 @@ PowerShell 输入问题
   → 10 节点 Workflow：计划 → 本地资料检索 → 证据审计 → Gate 等
   → 真实 retrieve→reason 边核对来源、片段、哈希和 Evidence Ledger
   → Gate 放行且证据足够才调用 Worker 生成最终草稿
-  → 严格题额外调用 Output Reviewer，随后发布策略决定交付或扣稿
+  → 学习入口所有实际生成草稿均调用 Output Reviewer，发布策略决定交付或扣稿
   → 保存最终可交付答复到当前 thread 的会话快照，返回答案、来源和轨迹
 ```
 
-入口是 [`run_learning.py`](../run_learning.py)，场景规则在 [`learning.py`](../workbench/deepreason/src/reasoning_agent_template/learning.py)，上游编排及发布顺序在 [`multiagent.py`](../workbench/deepreason/src/reasoning_agent_template/multiagent.py)。工作流定义在 [`learning.workflow.json`](../workbench/deepreason/learning_mvp/configs/workflows/learning.workflow.json)，交付核验在 [`workflow.py`](../workbench/deepreason/src/reasoning_agent_template/workflow.py)。**10 个节点不是 10 次模型调用**：本次脚本模型中，引导回答用了 3 次角色调用，严格回答用了 4 次，资料外止答只用了 2 次。Workflow 的 `reason` 节点生成状态说明；自然语言最终草稿是在工作流结束后由 Worker 产生。上游 `verify` 节点目前只记录 Gate 是否通过，不核验最终草稿。
+入口是 [`run_learning.py`](../run_learning.py)，场景规则在 [`learning.py`](../workbench/deepreason/src/reasoning_agent_template/learning.py)，上游编排及发布顺序在 [`multiagent.py`](../workbench/deepreason/src/reasoning_agent_template/multiagent.py)。工作流定义在 [`learning.workflow.json`](../workbench/deepreason/learning_mvp/configs/workflows/learning.workflow.json)，交付核验在 [`workflow.py`](../workbench/deepreason/src/reasoning_agent_template/workflow.py)。**10 个节点不是 10 次模型调用**：当前普通/严格生成正常均为 4 次，资料不足或拒绝未调用 Worker 时为 2 次；旧基线普通生成 3 次。Workflow 的 reason/verify 状态不等于模型最终答案审查，真正草稿在工作流后由 Worker 生成，再经最终 Reviewer。
 
 ## 2. 最简单的复现方法
 
@@ -171,3 +171,13 @@ HTTP 分类还覆盖模拟的 400、401、403、408、429、503，以及 429 携
 上游调用、重试和只升级合并复用，工作副本新增可覆盖解析入口，学习场景校验原始 JSON 后才允许进入归一化；格式失败不自动重试。完整回归后的示例 Ledger 已恢复至固定上游哈希。本轮真实千问 **0**，本机预占 **15/100**。真实格式兼容/误拦仍待 S2 验收；普通 guided 最终答案尚未启用同级最终审查，为下一包 S1.2。讲解与定向复现见[第二十六课](lessons/LEARNING_26_ROUTE_REVIEW_CONTRACT.md)。
 
 补充解析资源/截断回执时，中间一轮 229 项仅一处测试预期失败：合法深层 JSON 数组被产品正确按非对象拒绝，测试却期待语法错误。已改用真正截断 JSON 验证语法错误，保留数组非对象检查；定向 9 项再次全过后复跑完整回归。此次不是放松失败保护。
+
+## 17. 2026-10-15 普通生成答案最终审查
+
+固定原空泛脚本及三道普通题，改前 3/3 直接发布，改后 3/3 因无覆盖回执扣留；明确正常样例另测 3/3 可发布。普通题现在复用已有最终 Reviewer/引用/覆盖/本轮哈希校验，发布后才保存近期会话；缺资料、缺比较前提及拒绝说明不增加请求。审查阶段可见，成功重试不再记录异常原文。
+
+新增 **10 项**测试含 13 种审查失败模式、源块哈希破坏、403 单次/503 最多两次、成功重试与预算仅余三次的扣稿；完整副本 **239/239**（176.053 秒），入口 **11/11**（新增 guided_missing_coverage）、七组 Skill 配对 **7/7** 且无意外控制流差异。首次新用例发现重试异常原文泄漏后修复；学习相关回归有两处旧代价预期需按新增审查更新，未放松安全断言。
+
+普通生成模型请求 **3→4**；严格仍 4；标准止答/拒绝仍 2。脚本配对入口现 **20** 次，其中最终审查 4；人工标签 0/6，usage/货币成本未测。三组 Top-K 对照终态不变，恢复成功分支从两次路由请求增加 Worker 和最终审查。原坏脚本六题探针：资料锚点 4/4、四份草稿均审查并扣留、两题资料不足止答；目标终态匹配 3/6，不能当真实准确率或检索退步。路径仍仅观察到 9/14 条声明边和一种完整序列。
+
+真实千问 **0**、预占仍 **15/100**；示例 Ledger 已恢复。特意保留“盲目 Reviewer 自报 supported，结构全部合法仍放行错误事实”的用例，证明未解决语义真值。定向复现及归属见[第二十七课](lessons/LEARNING_27_GUIDED_ANSWER_RELEASE.md)，下一入口 S1.3 的六题/状态闭环；真实语义、误拦和延迟由 S2 验收。

@@ -119,7 +119,7 @@ def main(argv=None) -> int:
         raise ValueError("frozen_experiment_corpus_changed")
     if not (args.offline or args.qwen):
         print(json.dumps({"mode": "plan_only", "pairs": len(cases), "questions": [case["question"] for case in cases],
-                          "script_profile_attempts": 16, "four_roles_two_attempts_upper_bound": 48,
+                          "script_profile_attempts": 20, "four_roles_two_attempts_upper_bound": 48,
                           "experiment_attempt_cap": args.max_calls,
                           "real_qwen_calls": 0, "next": "--offline or explicit --qwen"}, ensure_ascii=False, indent=2))
         return 0

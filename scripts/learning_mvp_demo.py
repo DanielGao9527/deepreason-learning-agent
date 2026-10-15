@@ -14,7 +14,7 @@ sys.path.insert(0, str(WORKBENCH / "src"))
 sys.path.insert(0, str(WORKBENCH))
 
 from reasoning_agent_template.learning import LearningAssistant  # noqa: E402
-from tests.test_learning_mvp import ScriptedLearningClient  # noqa: E402
+from tests.test_learning_mvp import ReviewedLearningClient  # noqa: E402
 
 
 CASES = [
@@ -29,7 +29,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="deepreason-learning-demo-") as temp:
         workspace = Path(temp)
         shutil.copytree(WORKBENCH / "learning_mvp" / "knowledge", workspace / "knowledge")
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         assistant = LearningAssistant(workspace, client=client)
         for case_id, question in CASES:
             before = len(client.calls)

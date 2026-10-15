@@ -10,7 +10,7 @@ import unittest
 
 from reasoning_agent_template.answer_eval import score_case
 from reasoning_agent_template.learning import LearningAssistant
-from tests.test_learning_mvp import ScriptedLearningClient
+from tests.test_learning_mvp import ReviewedLearningClient, ScriptedLearningClient
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,20 +27,20 @@ class AnswerProbeTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def test_released_generic_concept_answer_misses_required_facts_despite_evidence(self):
+    def test_generic_concept_draft_is_withheld_despite_qualified_evidence(self):
         case = RUBRIC["cases"][0]
         client = ScriptedLearningClient()
         result = LearningAssistant(self.workspace, client=client).ask(case["question"], thread_id="probe")
         scored = score_case(case, result, list(client.calls))
-        self.assertEqual(scored["release"], "released_gate_only")
-        self.assertTrue(scored["decision_match"])
+        self.assertEqual(scored["release"], "withheld")
+        self.assertFalse(scored["decision_match"])
         self.assertEqual(scored["qualified_anchor_hits"], [True])
         self.assertFalse(scored["proxy_pass"])
-        self.assertEqual(scored["failure_layer"], "answer_wording")
+        self.assertEqual(scored["failure_layer"], "decision")
 
     def test_literal_proxy_can_accept_factually_reversed_claim(self):
         case = RUBRIC["cases"][0]
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         result = LearningAssistant(self.workspace, client=client).ask(case["question"], thread_id="probe")
         altered = deepcopy(result)
         altered["answer"] = "两个不同的键绝不会映射到同一槽位，所以哈希冲突不存在。"
@@ -50,7 +50,7 @@ class AnswerProbeTests(unittest.TestCase):
 
     def test_missing_source_anchor_is_not_mislabeled_as_answer_wording_failure(self):
         case = RUBRIC["cases"][0]
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         result = LearningAssistant(self.workspace, client=client).ask(case["question"], thread_id="probe")
         changed = deepcopy(case)
         changed["source_anchors"][0]["contains"] = "not in the qualified source"

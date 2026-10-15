@@ -201,13 +201,15 @@ class MultiAgentOrchestrator:
             )
             release = decide_release(answer, result.gate_decisions)
             events.extend(llm_events)
-            output_review = {"status": "not_run", "reason": "disabled_or_not_strict", "checked_claims": 0}
-            if (
-                self.config.runtime.get("output_review_enabled", False)
-                and result.state.evidence_mode == "required"
-                and result.state.evidence_strictness == "strict"
-                and release.status == "released_gate_only"
-            ):
+            output_review = {"status": "not_run", "reason": "policy_not_required_or_gate_blocked", "checked_claims": 0}
+            if release.status == "released_gate_only" and self._should_review_output(result.state, llm_status):
+                self._set_active_state(
+                    run_id=run_id, thread_id=thread_id, started_at=started_at,
+                    message=message, state=result.state, agent="output_reviewer",
+                    phase="output_review", stage="respond",
+                    hint="最终 Reviewer 正在核对答案、证据和问题覆盖；草稿尚未发布。",
+                    events=events,
+                )
                 outcome, review_events = self._review_output_answer(message, answer, result.state)
                 release = outcome.release
                 events.extend(review_events)
@@ -1578,10 +1580,19 @@ class MultiAgentOrchestrator:
                         "agent": agent,
                         "kind": retry_kind,
                         "duration_ms": duration_ms,
-                        "message": f"Model call failed, retrying once: {exc}",
+                        "error_type": type(exc).__name__,
+                        "http_status": (exc.status_code if isinstance(exc.status_code, int)
+                                        and 100 <= exc.status_code <= 599 else None),
+                        "message": "Model call failed; retrying once.",
                     }
                 )
         raise RuntimeError("unreachable retry state")
+
+    def _should_review_output(self, state: AgentState, llm_status: dict[str, Any]) -> bool:
+        """Generic callers retain their configured strict-evidence review policy."""
+        return bool(self.config.runtime.get("output_review_enabled", False)
+                    and state.evidence_mode == "required"
+                    and state.evidence_strictness == "strict")
 
     def _output_review_requirements(self, message: str, state: AgentState) -> list[dict[str, str]]:
         """Scenario hook; the generic upstream-style reviewer has no fixed checklist."""

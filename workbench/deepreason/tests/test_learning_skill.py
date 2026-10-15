@@ -12,7 +12,7 @@ from reasoning_agent_template.learning import LearningAssistant, LearningOrchest
 from reasoning_agent_template.learning_notes import LearningNoteStore
 from reasoning_agent_template.learning_skill import LearningSkillError, LearningSkillStore
 from reasoning_agent_template.models import AgentState, GateDecision
-from tests.test_learning_mvp import CORPUS, ScriptedLearningClient
+from tests.test_learning_mvp import CORPUS, ReviewedLearningClient
 
 
 class LearningSkillTests(unittest.TestCase):
@@ -167,7 +167,7 @@ class LearningSkillTests(unittest.TestCase):
         )
         question = "满二叉树和完全二叉树的定义有什么区别？"
 
-        class CapturingClient(ScriptedLearningClient):
+        class CapturingClient(ReviewedLearningClient):
             def __init__(self):
                 super().__init__()
                 self.worker_system = ""

@@ -129,6 +129,60 @@ class CompleteLearningReviewClient(ScriptedLearningClient):
         return ChatResult(content=self.ANSWER, model=self.model, raw={"offline": True})
 
 
+class ReviewedLearningClient(ScriptedLearningClient):
+    """Explicit positive fixtures for control-flow tests, not a quality judge.
+
+    Keep the original generic client unchanged for insufficient-answer probes.
+    Absolute-claim questions still use its incomplete review as a negative case.
+    """
+
+    def chat(self, messages, *, temperature, max_tokens):
+        system = messages[0].content
+        if "OUTPUT_REVIEW_JSON" in system:
+            request = json.loads(messages[-1].content)
+            if "一定" in request["question"]:
+                return super().chat(messages, temperature=temperature, max_tokens=max_tokens)
+            self.calls.append("output_reviewer")
+            sentences = [part + "。" for part in request["draft"].split("。") if part]
+            excerpts = {
+                "direct_answer": sentences[0], "reasoning": sentences[-1],
+                "exact_lookup": sentences[1], "range_query": sentences[2] if len(sentences) > 2 else sentences[-1],
+            }
+            sources = request["qualified_sources"]
+            anchor = ("两个不同的键" if "哈希冲突" in request["question"] else
+                      "一个结点最多" if "二叉树是什么" in request["question"] else "范围查询")
+            source = next((item for item in sources if anchor in item["text"]), sources[0])
+            offset = max(0, source["text"].find(anchor))
+            content = json.dumps({
+                "review_status": self.final_review,
+                "coverage_complete": self.final_review == "supported",
+                "findings": [] if self.final_review == "supported" else ["证据与结论需要复核"],
+                "review_context_hash": request["review_context_hash"],
+                "claims": [{"claim_id": "fixture-claim", "statement": request["draft"],
+                            "evidence_id": source["evidence_id"], "excerpt": source["text"][offset:offset + 40]}],
+                "coverage": [{"point_id": point["id"], "status": "covered",
+                              "draft_excerpt": excerpts[point["id"]]}
+                             for point in request["coverage_requirements"]],
+            }, ensure_ascii=False)
+            return ChatResult(content=content, model=self.model, raw={"offline": True})
+        if "ROUTING_DECISION_JSON" in messages[-1].content or "REVIEW_DECISION_JSON" in messages[-1].content:
+            return super().chat(messages, temperature=temperature, max_tokens=max_tokens)
+        question = messages[-1].content.split("用户输入：\n", 1)[-1].split("\n\n运行状态 JSON：", 1)[0]
+        if "一定" in question:
+            return super().chat(messages, temperature=temperature, max_tokens=max_tokens)
+        self.calls.append("worker")
+        if "满二叉树" in question and "完全二叉树" in question:
+            answer = "在本测试夹具中，满二叉树的内部结点恰有两个孩子。完全二叉树的末层从左向右填充。"
+        elif "哈希表" in question and "二叉搜索树" in question:
+            answer = ("两种结构的选择取决于查询类型。哈希表平均精确查找通常较快。"
+                      "二叉搜索树按键有序，便于范围查询。实际表现还受冲突、负载和平衡状态影响。")
+        elif "二叉树" in question:
+            answer = "二叉树的一个结点最多有两个非空孩子，左右位置有区别。二叉树定义本身不保证按键有序或保持平衡。"
+        else:
+            answer = "哈希冲突是两个不同的键被映射到同一槽位。发生冲突时需要用链地址法或开放寻址法等方式处理。"
+        return ChatResult(content=answer, model=self.model, raw={"offline": True})
+
+
 class LearningMvpTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -145,7 +199,7 @@ class LearningMvpTests(unittest.TestCase):
         return json.loads(raw), raw
 
     def test_concept_question_uses_local_evidence_and_guided_path(self):
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         answer = LearningAssistant(self.root, client=client).ask("什么是哈希冲突？", thread_id="learner-a")
 
         self.assertEqual(answer["learning"]["path"], "guided")
@@ -155,12 +209,12 @@ class LearningMvpTests(unittest.TestCase):
         self.assertTrue(answer["learning"]["sources"][0]["original_url"].startswith("https://opendsa.cs.vt.edu/"))
         self.assertIn("retrieve", answer["state_machine"]["trace"])
         self.assertEqual(answer["external_evidence"]["attempted_sources"], [])
-        self.assertEqual(answer["output_release"]["status"], "released_gate_only")
-        self.assertEqual(client.calls, ["route", "reviewer", "worker"])
+        self.assertEqual(answer["output_release"]["status"], "released_model_reviewed")
+        self.assertEqual(client.calls, ["route", "reviewer", "worker", "output_reviewer"])
         self.assertFalse((self.root / "local_state" / "failures").exists())
 
     def test_conditional_question_without_coverage_is_withheld_despite_supported_label(self):
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         answer = LearningAssistant(self.root, client=client).ask(
             "哈希表一定比平衡二叉搜索树快吗？比较精确查找和范围查询。",
             thread_id="learner-b",
@@ -198,7 +252,7 @@ class LearningMvpTests(unittest.TestCase):
                 self.assertEqual(saved.messages[-1]["content"], answer["answer"])
 
     def test_simple_protected_request_keeps_high_risk_despite_weak_model_route(self):
-        client = ScriptedLearningClient()  # Deliberately returns routine/low/none.
+        client = ReviewedLearningClient()  # Deliberately returns routine/low/none.
         assistant = LearningAssistant(self.root, client=client)
         answer = assistant.ask("请删除生产环境数据。", thread_id="protected-route")
 
@@ -215,7 +269,7 @@ class LearningMvpTests(unittest.TestCase):
         self.assertTrue(any(event["kind"] == "output_release_decision" for event in saved.events))
 
     def test_strict_answer_is_withheld_when_independent_review_reports_an_issue(self):
-        client = ScriptedLearningClient(final_review="issue")
+        client = ReviewedLearningClient(final_review="issue")
         answer = LearningAssistant(self.root, client=client).ask(
             "哈希表一定比平衡二叉搜索树快吗？比较精确查找和范围查询。",
             thread_id="learner-review",
@@ -232,7 +286,7 @@ class LearningMvpTests(unittest.TestCase):
         self.assertTrue(any(event["kind"] == "output_release_decision" for event in saved.events))
 
     def test_missing_material_skips_worker_and_does_not_publish_a_guess(self):
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         answer = LearningAssistant(self.root, client=client).ask(
             "请解释 ZxqvPrime-99 的内部缓存协议。", thread_id="learner-c"
         )
@@ -243,7 +297,7 @@ class LearningMvpTests(unittest.TestCase):
         self.assertTrue("资料" in answer["answer"] or "证据" in answer["answer"])
 
     def test_new_binary_tree_definition_can_reach_worker(self):
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         answer = LearningAssistant(self.root, client=client).ask("二叉树是什么？", thread_id="binary-definition")
 
         self.assertEqual(answer["learning"]["decision"], "answered")
@@ -252,7 +306,7 @@ class LearningMvpTests(unittest.TestCase):
                             for source in answer["learning"]["sources"]))
 
     def test_retrieval_handoff_is_validated_before_reason_and_worker(self):
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         answer = LearningAssistant(self.root, client=client).ask("什么是哈希冲突？", thread_id="handoff-valid")
 
         handoffs = [event for event in answer["events"] if event.get("kind") == "handoff_validated"]
@@ -265,7 +319,7 @@ class LearningMvpTests(unittest.TestCase):
     def test_empty_retrieval_is_valid_handoff_but_cannot_generate_answer(self):
         for path in (self.root / "knowledge").iterdir():
             path.unlink()
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         answer = LearningAssistant(self.root, client=client).ask("什么是哈希冲突？", thread_id="handoff-empty")
 
         handoffs = [event for event in answer["events"] if event.get("kind") == "handoff_validated"]
@@ -284,7 +338,7 @@ class LearningMvpTests(unittest.TestCase):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 shutil.copytree(CORPUS, root / "knowledge")
-                client = ScriptedLearningClient()
+                client = ReviewedLearningClient()
 
                 def faulty_retrieve(coordinator, state):
                     original_retrieve(coordinator, state)
@@ -323,7 +377,7 @@ class LearningMvpTests(unittest.TestCase):
         )
         for index, question in enumerate(questions):
             with self.subTest(question=question):
-                client = ScriptedLearningClient()
+                client = ReviewedLearningClient()
                 answer = LearningAssistant(self.root, client=client).ask(
                     question, thread_id=f"shape-comparison-{index}"
                 )
@@ -347,7 +401,7 @@ class LearningMvpTests(unittest.TestCase):
             "完全二叉树：除末层外各层填满，末层从左向右填充。",
             encoding="utf-8",
         )
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         original_retrieve = LocalKnowledgeBase.retrieve
         queries = []
         shared_scores = {}
@@ -410,7 +464,7 @@ class LearningMvpTests(unittest.TestCase):
                               sum(query in item.text for item in results)))
                 return results
 
-            client = ScriptedLearningClient()
+            client = ReviewedLearningClient()
             with patch.object(LocalKnowledgeBase, "retrieve", tracked_retrieve):
                 answer = LearningAssistant(root, client=client).ask(
                     "满二叉树和完全二叉树的定义有什么区别？", thread_id="topk-recovery",
@@ -425,7 +479,7 @@ class LearningMvpTests(unittest.TestCase):
             self.assertEqual(len(plan["tasks"][1]["retrieval_attempts"]), 1)
             self.assertEqual(len([event for event in answer["events"]
                                   if event.get("kind") == "retrieval_recovery_attempted"]), 1)
-            self.assertEqual(client.calls, ["route", "reviewer", "worker"])
+            self.assertEqual(client.calls, ["route", "reviewer", "worker", "output_reviewer"])
 
     def test_missing_subject_stops_after_one_wider_read_and_skips_worker(self):
         calls = []
@@ -435,7 +489,7 @@ class LearningMvpTests(unittest.TestCase):
             calls.append((query, kwargs["top_k"]))
             return original_retrieve(kb, query, **kwargs)
 
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         with patch.object(LocalKnowledgeBase, "retrieve", tracked_retrieve):
             answer = LearningAssistant(self.root, client=client).ask(
                 "满二叉树和完全二叉树的定义有什么区别？", thread_id="missing-after-retry",
@@ -450,7 +504,7 @@ class LearningMvpTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "knowledge").mkdir()
-            client = ScriptedLearningClient()
+            client = ReviewedLearningClient()
             calls = []
             original_retrieve = LocalKnowledgeBase.retrieve
 
@@ -467,7 +521,7 @@ class LearningMvpTests(unittest.TestCase):
             self.assertEqual(client.calls, ["route", "reviewer"])
 
     def test_corpus_change_during_retrieval_stops_before_worker_and_session(self):
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         original_retrieve = LocalKnowledgeBase.retrieve
         changed = False
 
@@ -494,7 +548,7 @@ class LearningMvpTests(unittest.TestCase):
         (self.root / "knowledge" / "08_shape_definitions_test_only.md").write_text(
             "满二叉树有两个非空孩子。完全二叉树的末层从左向右填充。", encoding="utf-8",
         )
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         original_worker = LearningOrchestrator._call_deepseek
 
         def change_before_worker(orchestrator, message, state, *, short_term_memory, long_term_memory):
@@ -517,7 +571,7 @@ class LearningMvpTests(unittest.TestCase):
         source = self.root / "knowledge" / "08_shape_definitions_test_only.md"
         source.write_text("满二叉树有两个非空孩子。完全二叉树末层从左向右填充。", encoding="utf-8")
 
-        class ChangingWorker(ScriptedLearningClient):
+        class ChangingWorker(ReviewedLearningClient):
             def chat(self, messages, *, temperature, max_tokens):
                 result = super().chat(messages, temperature=temperature, max_tokens=max_tokens)
                 if self.calls[-1] == "worker":
@@ -536,7 +590,7 @@ class LearningMvpTests(unittest.TestCase):
         self.assertNotIn("结论取决于问题条件", raw)
 
     def test_retrieval_timeout_does_not_retry_model_or_publish(self):
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         calls = []
         original_retrieve = LocalKnowledgeBase.retrieve
 
@@ -584,7 +638,7 @@ class LearningMvpTests(unittest.TestCase):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 shutil.copytree(CORPUS, root / "knowledge")
-                client = ScriptedLearningClient()
+                client = ReviewedLearningClient()
                 with patch("reasoning_agent_template.learning.build_comparison_plan", return_value=bad_plan(fault)):
                     with patch.object(LocalKnowledgeBase, "retrieve") as retrieve:
                         with self.assertRaises(LearningPlanError) as caught:
@@ -648,7 +702,7 @@ class LearningMvpTests(unittest.TestCase):
         self.assertNotIn("quota exhausted", raw)
 
     def test_failure_trace_is_durable_and_redacts_inputs_and_provider_text(self):
-        class FailingRoute(ScriptedLearningClient):
+        class FailingRoute(ReviewedLearningClient):
             def chat(self, messages, *, temperature, max_tokens):
                 raise LLMRequestError(
                     "PRIVATE_ERROR_VALUE", status_code=403, retryable=False,
@@ -666,11 +720,11 @@ class LearningMvpTests(unittest.TestCase):
             self.assertNotIn(secret, raw)
         self.assertFalse((self.root / "sessions" / "PRIVATE_THREAD_VALUE" / "snapshot.json").exists())
         # Failure evidence is a file, not merely the old orchestrator's in-memory status.
-        LearningAssistant(self.root, client=ScriptedLearningClient())
+        LearningAssistant(self.root, client=ReviewedLearningClient())
         self.assertEqual(self._failure_trace(self.root)[0]["run_id"], trace["run_id"])
 
     def test_trace_write_failure_preserves_original_model_error(self):
-        class FailingRoute(ScriptedLearningClient):
+        class FailingRoute(ReviewedLearningClient):
             def chat(self, messages, *, temperature, max_tokens):
                 raise LLMRequestError("original model failure", status_code=403, retryable=False)
 
@@ -681,7 +735,7 @@ class LearningMvpTests(unittest.TestCase):
         self.assertFalse((self.root / "local_state" / "failures").exists())
 
     def test_transient_routing_error_retries_once_within_budget(self):
-        class FailOnce(ScriptedLearningClient):
+        class FailOnce(ReviewedLearningClient):
             def __init__(self):
                 super().__init__()
                 self.attempts = 0
@@ -698,12 +752,12 @@ class LearningMvpTests(unittest.TestCase):
             "什么是哈希冲突？", thread_id="transient-routing"
         )
         self.assertEqual(answer["learning"]["decision"], "answered")
-        self.assertEqual(backend.attempts, 4)  # Failed route + successful route/reviewer/worker.
-        self.assertEqual(BudgetedQwenClient.calls_used_at(usage_db), 4)
+        self.assertEqual(backend.attempts, 5)  # Failed route + route/reviewer/worker/output review.
+        self.assertEqual(BudgetedQwenClient.calls_used_at(usage_db), 5)
         self.assertTrue(any(event["kind"] == "routing_retry" for event in answer["events"]))
 
     def test_worker_quota_error_does_not_retry_or_save_session(self):
-        class FailWorker(ScriptedLearningClient):
+        class FailWorker(ReviewedLearningClient):
             def __init__(self):
                 super().__init__()
                 self.worker_attempts = 0
@@ -746,7 +800,7 @@ class LearningMvpTests(unittest.TestCase):
         self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_same_thread_restores_recent_turns_after_restart_without_cross_thread_leak(self):
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         first = LearningAssistant(self.root, client=client)
         first.ask("什么是哈希冲突？", thread_id="learner-a")
 
@@ -759,7 +813,7 @@ class LearningMvpTests(unittest.TestCase):
         self.assertEqual(other_thread["memory"]["long_term"]["records"], 0)
 
     def test_learning_request_does_not_turn_a_question_into_permanent_profile(self):
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         answer = LearningAssistant(self.root, client=client).ask(
             "记住我不懂哈希冲突，什么是哈希冲突？", thread_id="learner-a"
         )
@@ -767,7 +821,7 @@ class LearningMvpTests(unittest.TestCase):
         self.assertFalse((self.root / "memory" / "user.jsonl").exists())
 
     def test_interactive_session_answers_and_keeps_one_thread(self):
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         assistant = LearningAssistant(self.root, client=client)
         output = io.StringIO()
         with patch("builtins.input", side_effect=["什么是哈希冲突？", "哈希冲突怎么处理？", "/exit"]), redirect_stdout(output):
@@ -779,11 +833,11 @@ class LearningMvpTests(unittest.TestCase):
         self.assertEqual([item["role"] for item in messages], ["user", "assistant", "user", "assistant"])
 
     def test_timing_breakdown_shows_serial_model_calls_and_local_retrieval(self):
-        client = ScriptedLearningClient()
+        client = ReviewedLearningClient()
         guided = LearningAssistant(self.root, client=client).ask("什么是哈希冲突？", thread_id="timing-guided")
         guided_labels = dict(timing_breakdown(guided))
         self.assertTrue({"总计", "路由", "路线复核", "本地检索", "回答生成"} <= guided_labels.keys())
-        self.assertNotIn("答案复核", guided_labels)
+        self.assertIn("答案复核", guided_labels)
         deep = LearningAssistant(self.root, client=client).ask(
             "哈希表一定比二叉搜索树快吗？比较精确查找和范围查询。", thread_id="timing-deep"
         )

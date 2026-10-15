@@ -13,10 +13,10 @@ from reasoning_agent_template.learning import (
 )
 from reasoning_agent_template.llm import ChatResult, LLMRequestError
 from reasoning_agent_template.multiagent import MultiAgentOrchestrator
-from tests.test_learning_mvp import CORPUS, ScriptedLearningClient
+from tests.test_learning_mvp import CORPUS, ReviewedLearningClient
 
 
-class RouteReviewClient(ScriptedLearningClient):
+class RouteReviewClient(ReviewedLearningClient):
     def __init__(self, reply):
         super().__init__()
         self.reply = reply
@@ -113,7 +113,7 @@ class LearningRouteReviewTests(unittest.TestCase):
                 self.assertEqual(answer["reviewer"]["status"], "approve")
                 self.assertEqual(answer["learning"]["decision"], "answered")
                 self.assertEqual(answer["learning"]["path"], "guided")
-                self.assertEqual(client.calls, ["route", "reviewer", "worker"])
+                self.assertEqual(client.calls, ["route", "reviewer", "worker", "output_reviewer"])
 
     def test_valid_review_escalation_and_revision_really_upgrade_before_workflow(self):
         for status in ("escalate", "revise"):
@@ -128,8 +128,8 @@ class LearningRouteReviewTests(unittest.TestCase):
                 self.assertEqual(answer["routing"]["difficulty"], "hard")
                 self.assertEqual(answer["evidence"]["strictness"], "strict")
                 self.assertEqual(answer["learning"]["path"], "deep")
-                # The scripted final review still lacks the strict coverage receipt.
-                self.assertEqual(answer["learning"]["decision"], "review_withheld")
+                # This concept fixture has a complete answer and coverage receipt.
+                self.assertEqual(answer["learning"]["decision"], "answered")
                 self.assertEqual(client.calls, ["route", "reviewer", "worker", "output_reviewer"])
 
     def test_noop_or_weaker_revision_cannot_count_as_a_completed_review(self):

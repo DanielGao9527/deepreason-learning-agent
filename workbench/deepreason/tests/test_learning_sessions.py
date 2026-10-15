@@ -19,13 +19,13 @@ from reasoning_agent_template.learning_sessions import (
     LearningSessionBusyError, LearningSessionStore, session_execution_guard,
 )
 from reasoning_agent_template.llm import LLMRequestError
-from tests.test_learning_mvp import CORPUS, ScriptedLearningClient
+from tests.test_learning_mvp import CORPUS, ReviewedLearningClient
 
 
 QUESTIONS = [f"什么是哈希冲突？第{index}轮。" for index in (1, 2, 3)]
 
 
-class BlockedWorkerClient(ScriptedLearningClient):
+class BlockedWorkerClient(ReviewedLearningClient):
     def __init__(self):
         super().__init__()
         self.entered = Event()
@@ -50,7 +50,7 @@ class LearningSessionTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def assistant(self, client=None):
-        return LearningAssistant(self.root, client=client or ScriptedLearningClient())
+        return LearningAssistant(self.root, client=client or ReviewedLearningClient())
 
     def users(self, thread="shared"):
         return [message["content"] for message in
@@ -210,8 +210,8 @@ class LearningSessionTests(unittest.TestCase):
 import sys
 from pathlib import Path
 from reasoning_agent_template.learning import LearningAssistant
-from tests.test_learning_mvp import ScriptedLearningClient
-class Client(ScriptedLearningClient):
+from tests.test_learning_mvp import ReviewedLearningClient
+class Client(ReviewedLearningClient):
     def chat(self, messages, **kwargs):
         result = super().chat(messages, **kwargs)
         if self.calls[-1] == 'worker':
@@ -245,8 +245,8 @@ LearningAssistant(Path(sys.argv[1]), client=Client()).ask('什么是哈希冲突
 import sys
 from pathlib import Path
 from reasoning_agent_template.learning import LearningAssistant
-from tests.test_learning_mvp import ScriptedLearningClient
-LearningAssistant(Path(sys.argv[1]), client=ScriptedLearningClient()).ask(sys.argv[2], thread_id='shared')
+from tests.test_learning_mvp import ReviewedLearningClient
+LearningAssistant(Path(sys.argv[1]), client=ReviewedLearningClient()).ask(sys.argv[2], thread_id='shared')
 """
         process = self.child(script, QUESTIONS[1])
         try:

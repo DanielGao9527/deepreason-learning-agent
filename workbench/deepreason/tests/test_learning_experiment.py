@@ -218,10 +218,10 @@ class ExperimentCliWiringTests(unittest.TestCase):
         with patch.object(self.cli, "ROOT", self.root), patch.object(self.cli, "USAGE_DB", self.db), \
              patch.object(self.cli, "qwen_client_from_env", return_value=budget), redirect_stdout(io.StringIO()):
             self.assertEqual(self.cli.main(["--qwen", "--max-calls", "32"]), 0)
-        self.assertEqual(BudgetedQwenClient.calls_used_at(self.db), 16)
+        self.assertEqual(BudgetedQwenClient.calls_used_at(self.db), 20)
         folder = next((self.root / "artifacts" / "experiments").iterdir())
         manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["repository_reservations_after"], 16)
+        self.assertEqual(manifest["repository_reservations_after"], 20)
         self.assertEqual(manifest["status"], "completed")
         self.assertTrue((folder / "review.json").is_file())
 

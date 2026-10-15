@@ -16,7 +16,7 @@ sys.path.insert(0, str(WORKBENCH))
 from reasoning_agent_template.knowledge import LocalKnowledgeBase  # noqa: E402
 from reasoning_agent_template.learning import LearningAssistant, _corpus_fingerprint  # noqa: E402
 from reasoning_agent_template.learning_plan import build_comparison_plan  # noqa: E402
-from tests.test_learning_mvp import ScriptedLearningClient  # noqa: E402
+from tests.test_learning_mvp import ReviewedLearningClient  # noqa: E402
 
 
 QUESTION = "满二叉树和完全二叉树的定义有什么区别？"
@@ -62,7 +62,7 @@ def _trial(parent: Path, scenario: str, budget: int) -> dict:
         plan["max_retrieval_attempts_per_subject"] = budget
         return plan
 
-    client = ScriptedLearningClient()
+    client = ReviewedLearningClient()
     with patch.object(LocalKnowledgeBase, "retrieve", tracked_retrieve), patch(
         "reasoning_agent_template.learning.build_comparison_plan", side_effect=budgeted_plan,
     ):

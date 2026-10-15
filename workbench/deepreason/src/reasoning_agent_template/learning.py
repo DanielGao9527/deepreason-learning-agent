@@ -537,6 +537,14 @@ class LearningOrchestrator(MultiAgentOrchestrator):
                 raise LearningRouteReviewError("invalid_review_number")
         return review
 
+    def _should_review_output(self, state: AgentState, llm_status: dict[str, Any]) -> bool:
+        # The learning entrypoint never publishes a generated draft with gate-only
+        # approval. Deterministic abstention/refusal messages skip the model review.
+        if llm_status.get("status") != "called":
+            return False
+        self._check_plan_source_version(state)
+        return True
+
     def _output_review_requirements(self, message: str, state: AgentState) -> list[dict[str, str]]:
         """Bounded checklist from the user's explicit learning question, not model prose."""
         requirements = [

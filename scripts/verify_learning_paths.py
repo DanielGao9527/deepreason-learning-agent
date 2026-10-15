@@ -18,13 +18,15 @@ sys.path.insert(0, str(WORKBENCH))
 from reasoning_agent_template.learning import LearningAssistant, LearningRouteReviewError  # noqa: E402
 from reasoning_agent_template.knowledge import LocalKnowledgeBase  # noqa: E402
 from reasoning_agent_template.workflow import TemplateCoordinator, WorkflowContractError  # noqa: E402
-from tests.test_learning_mvp import CompleteLearningReviewClient, ScriptedLearningClient  # noqa: E402
+from tests.test_learning_mvp import CompleteLearningReviewClient, ReviewedLearningClient, ScriptedLearningClient  # noqa: E402
 from tests.test_learning_route_review import RouteReviewClient  # noqa: E402
 
 
 CASES = (
-    ("guided_answer", "什么是哈希冲突？", "answered", "guided", "allow", "released_gate_only",
-     ["route", "reviewer", "worker"], "supported"),
+    ("guided_answer", "什么是哈希冲突？", "answered", "guided", "allow", "released_model_reviewed",
+     ["route", "reviewer", "worker", "output_reviewer"], "supported"),
+    ("guided_missing_coverage", "什么是哈希冲突？", "review_withheld", "guided", "allow", "withheld",
+     ["route", "reviewer", "worker", "output_reviewer"], "supported"),
     ("deep_answer", "哈希表一定比平衡二叉搜索树快吗？比较精确查找和范围查询。",
      "answered", "deep", "allow", "released_model_reviewed",
      ["route", "reviewer", "worker", "output_reviewer"], "supported"),
@@ -59,8 +61,9 @@ def _check_equal(case_id: str, label: str, observed: object, expected: object) -
 def _ordinary_case(parent: Path, spec: tuple) -> dict:
     case_id, question, decision, path, gate, release, calls, final_review = spec
     workspace = _workspace(parent, case_id)
-    client = (CompleteLearningReviewClient() if case_id == "deep_answer"
-              else ScriptedLearningClient(final_review=final_review))
+    client = (CompleteLearningReviewClient() if case_id == "deep_answer" else
+              ScriptedLearningClient() if case_id == "guided_missing_coverage" else
+              ReviewedLearningClient(final_review=final_review))
     assistant = LearningAssistant(workspace, client=client)
     payload = assistant.ask(question, thread_id=case_id)
     observed_gate = payload["gates"]["decisions"][-1]["status"]
@@ -103,7 +106,7 @@ def _ordinary_case(parent: Path, spec: tuple) -> dict:
 def _invalid_handoff(parent: Path) -> dict:
     case_id = "invalid_handoff"
     workspace = _workspace(parent, case_id)
-    client = ScriptedLearningClient()
+    client = ReviewedLearningClient()
     assistant = LearningAssistant(workspace, client=client)
     original_retrieve = TemplateCoordinator._retrieve
 
@@ -198,7 +201,7 @@ def _top_k_recovery(parent: Path) -> dict:
                          "subject_matches": sum(query in item.text for item in results)})
         return results
 
-    client = ScriptedLearningClient()
+    client = ReviewedLearningClient()
     with patch.object(LocalKnowledgeBase, "retrieve", tracked_retrieve):
         payload = LearningAssistant(workspace, client=client).ask(
             "满二叉树和完全二叉树的定义有什么区别？", thread_id=case_id,
@@ -209,7 +212,7 @@ def _top_k_recovery(parent: Path) -> dict:
     _check_equal(case_id, "top-k attempts", [item["top_k"] for item in attempts], [4, 12, 4])
     _check_equal(case_id, "subject matches", [item["subject_matches"] for item in attempts], [0, 1, 1])
     _check_equal(case_id, "score floors", [item["min_score"] for item in attempts], [0.08] * 3)
-    _check_equal(case_id, "model calls", client.calls, ["route", "reviewer", "worker"])
+    _check_equal(case_id, "model calls", client.calls, ["route", "reviewer", "worker", "output_reviewer"])
     _check_equal(case_id, "failure files", len(list((workspace / "local_state" / "failures").glob("*.json"))), 0)
     return {
         "case": case_id,
