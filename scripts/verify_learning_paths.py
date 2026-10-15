@@ -15,10 +15,11 @@ WORKBENCH = ROOT / "workbench" / "deepreason"
 sys.path.insert(0, str(WORKBENCH / "src"))
 sys.path.insert(0, str(WORKBENCH))
 
-from reasoning_agent_template.learning import LearningAssistant  # noqa: E402
+from reasoning_agent_template.learning import LearningAssistant, LearningRouteReviewError  # noqa: E402
 from reasoning_agent_template.knowledge import LocalKnowledgeBase  # noqa: E402
 from reasoning_agent_template.workflow import TemplateCoordinator, WorkflowContractError  # noqa: E402
 from tests.test_learning_mvp import CompleteLearningReviewClient, ScriptedLearningClient  # noqa: E402
+from tests.test_learning_route_review import RouteReviewClient  # noqa: E402
 
 
 CASES = (
@@ -145,6 +146,33 @@ def _invalid_handoff(parent: Path) -> dict:
     }
 
 
+def _invalid_route_review(parent: Path) -> dict:
+    case_id = "invalid_route_review"
+    workspace = _workspace(parent, case_id)
+    client = RouteReviewClient("{}")
+    try:
+        LearningAssistant(workspace, client=client).ask("什么是哈希冲突？", thread_id=case_id)
+    except LearningRouteReviewError as error:
+        _check_equal(case_id, "reason", error.code, "invalid_review_status")
+    else:
+        raise AssertionError("invalid route review was allowed to continue")
+    _check_equal(case_id, "model calls", client.calls, ["route", "reviewer"])
+    saved = (workspace / "sessions" / case_id / "snapshot.json").exists()
+    _check_equal(case_id, "session saved", saved, False)
+    failures = list((workspace / "local_state" / "failures").glob("*.json"))
+    _check_equal(case_id, "failure trace count", len(failures), 1)
+    trace = json.loads(failures[0].read_text(encoding="utf-8"))
+    _check_equal(case_id, "terminal", trace["terminal_status"], "route_review_failed")
+    _check_equal(case_id, "reason", trace["reason_code"], "invalid_review_status")
+    return {
+        "case": case_id, "expected_result": "route_review_failed",
+        "observed_result": "route_review_failed", "path": "interrupted_before_workflow",
+        "gate": "not_reached", "release": "not_reached", "model_calls": client.calls,
+        "qualified_evidence_count": None, "stage_trace": None, "session_saved": saved,
+        "failure_trace": trace["terminal_status"], "passed": True,
+    }
+
+
 def _top_k_recovery(parent: Path) -> dict:
     case_id = "top_k_recovery"
     workspace = parent / case_id
@@ -205,6 +233,7 @@ def main() -> int:
         rows = [_ordinary_case(parent, spec) for spec in CASES]
         rows.append(_invalid_handoff(parent))
         rows.append(_top_k_recovery(parent))
+        rows.append(_invalid_route_review(parent))
     spec = json.loads((WORKBENCH / "learning_mvp" / "configs" / "workflows" /
                        "learning.workflow.json").read_text(encoding="utf-8"))
     declared = {(edge["from"], edge["to"]): edge["id"] for edge in spec["edges"]}
@@ -215,7 +244,7 @@ def main() -> int:
     }
     report = {
         "kind": "offline_scripted_mvp_acceptance",
-        "scope": "Seven selected terminal outcomes plus one bounded retrieval recovery; not exhaustive control-flow coverage",
+        "scope": "Selected answer, refusal, handoff/review failure and bounded retrieval cases; not exhaustive control-flow coverage",
         "passed": sum(row["passed"] for row in rows),
         "total": len(rows),
         "real_qwen_calls": 0,

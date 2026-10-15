@@ -115,3 +115,11 @@
 - `tests/test_learning_sessions.py`：14 项故障/回归测试；A→B→A 三轮改前快照只剩 2 轮，改后保留 3 轮，第三轮路由消费前两轮；包含跨进程提交/竞争、Worker 阶段终止进程与替换失败。完整副本 220/220，九例入口 9/9。
 
 同轮真实千问对照在第一条 route 请求 HTTP 403 后停止，无评分包；仓库预占 14→15/100。会话增强的实现和测试均无额外真实模型调用。课程及限制见 lab 的 `docs/lessons/LEARNING_25_SESSION_EXECUTION_AND_COMMIT.md`；不宣称通用并行平台、问答幂等或 checkpoint 续跑。
+
+第二十六课完成现行 S1.1 的**学习路由复核输出契约**，固定上游未改：
+
+- `multiagent.py`：只新增 `_parse_route_review` 可覆盖入口；通用调用继续原宽松解析，原模型重试和只升级合并复用。
+- `learning.py`：本项目与 AI 协作新增原始回执 JSON/必需字段/枚举/列表/数值/重复键校验、未应用修订中断、`LearningRouteReviewError`、`route_review_failed` 脱敏终态和 CLI 接线；校验位于默认归一化之前，格式错误不重试。
+- `tests/test_learning_route_review.py`、lab 的 `scripts/verify_learning_paths.py`：新增 9 项测试（含 32 种坏回执和 2 种不可应用修订），一键验收增加坏复核中断。三类已复现故障改前均调用 Worker/保存，改后均在检索前停止且保留旧历史。完整 229/229、入口 10/10。
+
+本轮千问真实请求 0，预占仍 15/100，示例 Ledger 已恢复至上游哈希。真实格式兼容和误拦未测；普通题最终审查是下一包 S1.2，未提前标完成。完整范围及教学说明见 lab 的 `docs/lessons/LEARNING_26_ROUTE_REVIEW_CONTRACT.md`。

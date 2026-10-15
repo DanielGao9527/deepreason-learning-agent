@@ -1413,6 +1413,10 @@ class MultiAgentOrchestrator:
             return route, events
         return _normalize_route_decision(parsed, source="llm", fallback_message=message), events
 
+    def _parse_route_review(self, content: str) -> dict[str, Any] | None:
+        """Scenario hook; generic callers retain the upstream tolerant parser."""
+        return _json_object_from_text(content)
+
     def _call_reviewer(
         self,
         message: str,
@@ -1438,7 +1442,7 @@ class MultiAgentOrchestrator:
             retry_kind="reviewer_retry",
         )
         duration_ms = round((perf_counter() - started) * 1000, 2)
-        parsed = _json_object_from_text(result.content)
+        parsed = self._parse_route_review(result.content)
         events = [
             *retry_events,
             {

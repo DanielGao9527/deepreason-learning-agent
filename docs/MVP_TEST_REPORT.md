@@ -1,13 +1,13 @@
 # 最小运行闭环与测试报告
 
-测试日期：2026-10-14。对象是 `workbench/deepreason/` 中的学习助手，不是根目录早期工具循环样例。下面区分脚本模型离线验收、真实千问烟测与上游完整回归。**本报告记录的是第十六课比较计划接入之前的闭环基线**；最新 148 项回归和比较题结果见[项目状态](PROJECT_STATUS.md)与[第十六课](lessons/LEARNING_16_REACHABILITY_AND_BOUNDED_PLAN.md)。
+更新：2026-10-15。对象是 `workbench/deepreason/` 中的学习助手。**最新完整回归 229/229，十例离线入口 10/10；真实千问验收仍待通过。** 第 1–4 节保留 2026-10-14 初始基线，第 5–16 节按时间记录后续修订；当前边界见[项目状态](PROJECT_STATUS.md)，最新路由复核修复见第 16 节。脚本模型、真实千问和完整回归分别记账。
 
 ## 1. 现在的最小运行闭环
 
 ```text
 PowerShell 输入问题
   → LearningAssistant 接收问题、读取当前 thread 的近期会话
-  → Coordinator 模型给出路由，Reviewer 模型复核
+  → Coordinator 模型给出路由，Reviewer 模型复核；无效复核在检索前停止
   → 10 节点 Workflow：计划 → 本地资料检索 → 证据审计 → Gate 等
   → 真实 retrieve→reason 边核对来源、片段、哈希和 Evidence Ledger
   → Gate 放行且证据足够才调用 Worker 生成最终草稿
@@ -161,3 +161,13 @@ HTTP 分类还覆盖模拟的 400、401、403、408、429、503，以及 429 携
 最简单复现：在 `workbench/deepreason` 下设置 `PYTHONPATH=src`，运行 `..\..\.venv\Scripts\python.exe -m unittest tests.test_learning_sessions -v`，预期 14 项 OK，无 Key 或真实模型调用。详细案例、代码职责及限制见[第二十五课](lessons/LEARNING_25_SESSION_EXECUTION_AND_COMMIT.md)。保护只覆盖本地学习入口的合作调用；不是队列、问答请求幂等、全资源事务或 checkpoint 续跑，Unix 分支尚未实测。
 
 本轮先尝试现成真实配对入口：第一条 route 请求约 464.07 ms 返回不可重试 HTTP 403，实验中止、无第二次请求或评分包；仓库预占 **14→15/100**，没有真实答案/usage。脱敏遥测未提供更具体的服务错误码，原因不作推断。其后会话实现及测试真实千问请求 **0**。
+
+## 16. 2026-10-15 路由 Reviewer 失败边界
+
+三种实际故障：坏 JSON、空对象和拼错 review_status，改前全部继续生成并保存回答 **3/3**；改后全部 `route_review_failed` **3/3**，只调用 route/reviewer，检索与 Worker 未执行，没有该轮会话提交。初始历史字节保持不变，修正后同实例可继续。原始摘要为本机 `artifacts/analysis/learning_route_review_before.json`、`learning_route_review_after.json`，不是答案正确率。
+
+新增 **9/9** 项测试含 32 种无效回执参数案例、2 种不可应用修订、正常批准/升级、原严格路线不降级、传输有限重试、失败脱敏和 CLI 行为。完整副本 **229/229**（132.266 秒）；现有一键脚本增加 `invalid_route_review`，**10/10**，预期为 `route_review_failed/invalid_review_status`、会话未保存、模型序列仅 route/reviewer。声明边仍观察到 **9/14**、完整节点序列仍 **1**，不是全路径覆盖率。
+
+上游调用、重试和只升级合并复用，工作副本新增可覆盖解析入口，学习场景校验原始 JSON 后才允许进入归一化；格式失败不自动重试。完整回归后的示例 Ledger 已恢复至固定上游哈希。本轮真实千问 **0**，本机预占 **15/100**。真实格式兼容/误拦仍待 S2 验收；普通 guided 最终答案尚未启用同级最终审查，为下一包 S1.2。讲解与定向复现见[第二十六课](lessons/LEARNING_26_ROUTE_REVIEW_CONTRACT.md)。
+
+补充解析资源/截断回执时，中间一轮 229 项仅一处测试预期失败：合法深层 JSON 数组被产品正确按非对象拒绝，测试却期待语法错误。已改用真正截断 JSON 验证语法错误，保留数组非对象检查；定向 9 项再次全过后复跑完整回归。此次不是放松失败保护。

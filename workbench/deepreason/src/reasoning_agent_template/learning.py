@@ -23,7 +23,10 @@ from reasoning_agent_template.learning_sessions import (
 )
 from reasoning_agent_template.knowledge import LocalKnowledgeBase, SUPPORTED_EXTENSIONS
 from reasoning_agent_template.models import AgentState, utc_now
-from reasoning_agent_template.multiagent import MultiAgentOrchestrator, _normalize_thread_id
+from reasoning_agent_template.multiagent import (
+    DIFFICULTY_ORDER, RISK_ORDER, ROUTE_KEYS, SOURCE_VALUES, STRICTNESS_ORDER,
+    MultiAgentOrchestrator, _normalize_thread_id,
+)
 from reasoning_agent_template.risk import classify_evidence_requirement
 from reasoning_agent_template.workflow import TemplateCoordinator, WorkflowContractError
 
@@ -47,6 +50,14 @@ class LearningCorpusChangedError(RuntimeError):
 
 class LearningRetrievalTimeoutError(RuntimeError):
     """A local retrieval attempt timed out; do not infer an answer from partial data."""
+
+
+class LearningRouteReviewError(RuntimeError):
+    """A review that cannot be consumed must not count as approval."""
+
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(f"路线复核输出无效（{code}）；本轮已停止，未生成回答。")
 
 
 class BudgetedQwenClient:
@@ -371,6 +382,9 @@ class LearningOrchestrator(MultiAgentOrchestrator):
         elif isinstance(error, LearningRetrievalTimeoutError):
             terminal = "retrieval_unavailable"
             reason = "local_retrieval_timeout"
+        elif isinstance(error, LearningRouteReviewError):
+            terminal = "route_review_failed"
+            reason = _safe_trace_label(error.code)
         elif isinstance(error, WorkflowContractError):
             terminal = "handoff_rejected"
             reason = _safe_trace_label(error.code)
@@ -449,9 +463,79 @@ class LearningOrchestrator(MultiAgentOrchestrator):
         )
         messages[0] = ChatMessage(
             role="system",
-            content=messages[0].content + "学习任务中，绝对化结论和条件依赖比较须进入严格证据路径；资料来源限本地课程语料。",
+            content=messages[0].content + (
+                "学习任务中，绝对化结论和条件依赖比较须进入严格证据路径；资料来源限本地课程语料。"
+                "严格遵守给定字段和枚举，必须包含 review_status 和字符串数组 findings。"
+                "approve 时 findings 必须为空；有问题请用 escalate 或 revise，给出 findings 和更严格的路由字段。"
+                "不要只写建议文字，也不要用无法提升审查强度的修改表示复核已完成。"
+            ),
         )
         return messages
+
+    def _parse_route_review(self, content: str) -> dict[str, Any]:
+        """Validate the raw receipt before upstream defaults can hide omissions."""
+        def unique_object(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise LearningRouteReviewError("duplicate_review_field")
+                result[key] = value
+            return result
+
+        def invalid_number(_value):
+            raise LearningRouteReviewError("invalid_review_number")
+
+        if not isinstance(content, str):
+            raise LearningRouteReviewError("invalid_review_json")
+        text = content.strip()
+        fenced = re.fullmatch(r"```(?:json)?[ \t]*\r?\n(.*?)\r?\n```", text, re.I | re.S)
+        if fenced:
+            text = fenced.group(1)
+        try:
+            review = json.loads(text, object_pairs_hook=unique_object, parse_constant=invalid_number)
+        except (ValueError, RecursionError):
+            raise LearningRouteReviewError("invalid_review_json") from None
+        if not isinstance(review, dict):
+            raise LearningRouteReviewError("invalid_review_object")
+        if set(review) - (ROUTE_KEYS | {"review_status", "findings"}):
+            raise LearningRouteReviewError("unknown_review_field")
+        status = review.get("review_status")
+        if not isinstance(status, str) or status not in {"approve", "escalate", "revise"}:
+            raise LearningRouteReviewError("invalid_review_status")
+        for key in ("findings", "reasons", "sources"):
+            if key == "findings" or key in review:
+                values = review.get(key)
+                if not isinstance(values, list) or any(
+                    not isinstance(value, str) or not value.strip() for value in values
+                ):
+                    raise LearningRouteReviewError("invalid_review_list")
+                if key == "sources" and any(value not in SOURCE_VALUES for value in values):
+                    raise LearningRouteReviewError("invalid_review_source")
+        if status == "approve" and review["findings"]:
+            raise LearningRouteReviewError("approval_contains_findings")
+        if status in {"escalate", "revise"} and not review["findings"]:
+            raise LearningRouteReviewError("missing_review_findings")
+        enums = {
+            "difficulty": set(DIFFICULTY_ORDER), "risk_level": set(RISK_ORDER),
+            "evidence_strictness": set(STRICTNESS_ORDER),
+            "evidence_mode": {"optional", "required"},
+            "workflow": {"routine", "evidence_soft", "evidence_strict", "protected_action"},
+            "category": {"routine", "scientific_claim", "technical_claim", "academic",
+                         "decision_analysis", "regulated_domain", "high_risk_action",
+                         "current_factual", "explicit_evidence_request", "hard_reasoning"},
+        }
+        for key, allowed in enums.items():
+            if key in review and (not isinstance(review[key], str) or review[key] not in allowed):
+                raise LearningRouteReviewError("invalid_review_route_field")
+        if "retrieval_query" in review and (
+            not isinstance(review["retrieval_query"], str) or not review["retrieval_query"].strip()
+        ):
+            raise LearningRouteReviewError("invalid_review_query")
+        if "confidence" in review:
+            confidence = review["confidence"]
+            if type(confidence) not in {int, float} or not 0 <= confidence <= 1:
+                raise LearningRouteReviewError("invalid_review_number")
+        return review
 
     def _output_review_requirements(self, message: str, state: AgentState) -> list[dict[str, str]]:
         """Bounded checklist from the user's explicit learning question, not model prose."""
@@ -501,6 +585,8 @@ class LearningOrchestrator(MultiAgentOrchestrator):
         route, review, events = super()._call_reviewer(
             message, coordinator_route, short_term_memory=short_term_memory, long_term_memory=long_term_memory
         )
+        if review["review_status"] in {"escalate", "revise"} and route.get("reviewer_route_ignored"):
+            raise LearningRouteReviewError("review_change_not_applied")
         return _local_learning_route(route, message), review, events
 
     def _call_deepseek(self, message: str, state: AgentState, *, short_term_memory, long_term_memory):
@@ -695,7 +781,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         payload = LearningAssistant(args.workspace).ask(" ".join(args.question), thread_id=args.thread)
     except (MissingApiKeyError, QwenCallLimitError, WorkflowContractError, LearningPlanError,
-            LearningSessionBusyError) as exc:
+            LearningSessionBusyError, LearningRouteReviewError) as exc:
         parser.exit(2, str(exc) + "\n")
     except LLMRequestError as exc:
         parser.exit(2, f"模型请求失败：{exc}。本轮未生成回答。\n")
@@ -766,7 +852,7 @@ def interactive_session(assistant: LearningAssistant, *, thread_id: str = "defau
         try:
             payload = assistant.ask(question, thread_id=thread_id)
         except (MissingApiKeyError, QwenCallLimitError, LLMRequestError, WorkflowContractError,
-                LearningPlanError, LearningSessionBusyError) as exc:
+                LearningPlanError, LearningSessionBusyError, LearningRouteReviewError) as exc:
             print(f"本轮失败（{type(exc).__name__}）：{exc}")
         except Exception as exc:
             print(f"本轮失败（{type(exc).__name__}）。本次未得到可交付答案；请检查配置或用测试复现。")
