@@ -28,7 +28,7 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe scripts\learning_mvp_demo.py
 ```
 
-离线演示使用脚本模型，不需要 API Key，也不代表真实答案质量。要实际连续提问，请在**本机环境变量**中设置 `DEEPREASON_QWEN_API_KEY` 或 `DASHSCOPE_API_KEY`，然后运行：
+离线演示会直接展示六题回答，再检查新进程恢复会话、笔记重复提交及 Skill 候选/审批/回退。每次保留独立的 `artifacts/demos/learning-*/`：`README.md` 是实际命令与回执，`report.json` 是完整轨迹。它使用脚本模型，不需要 API Key，不代表真实答案质量；详见[第二十八课](docs/lessons/LEARNING_28_APPLICATION_WALKTHROUGH.md)。要实际连续提问，请在**本机环境变量**中设置 `DEEPREASON_QWEN_API_KEY` 或 `DASHSCOPE_API_KEY`，然后运行：
 
 ```powershell
 .\.venv\Scripts\python.exe run_learning.py
@@ -48,7 +48,7 @@ py -3.12 -m venv .venv
 
 ## 验证与边界
 
-最简单的离线验收是在仓库根目录运行 `.\.venv\Scripts\python.exe scripts\verify_learning_paths.py`；当前九例含严格题完整答案发布与覆盖清单缺失扣稿对照，路径覆盖口径、预期结果与实测见[最小闭环测试报告](docs/MVP_TEST_REPORT.md)。运行 `.\.venv\Scripts\python.exe scripts\eval_bounded_recovery.py` 可复现相同初态下检索预算 1 次与 2 次的三组开关对照。
+最简单的离线验收是在仓库根目录运行 `.\.venv\Scripts\python.exe scripts\verify_learning_paths.py`；当前十一例包含正常发布、覆盖缺失扣稿、无效路由复核和坏交付等情况，路径覆盖口径、预期结果与实测见[最小闭环测试报告](docs/MVP_TEST_REPORT.md)。运行 `.\.venv\Scripts\python.exe scripts\eval_bounded_recovery.py` 可复现相同初态下检索预算 1 次与 2 次的三组开关对照。
 
 在 `workbench/deepreason` 目录运行离线测试：
 
@@ -59,7 +59,7 @@ $env:PYTHONPATH='src'
 
 最近一次完整回归及已观察的失败记录见[项目状态](docs/PROJECT_STATUS.md)。评测题与无模型诊断器分别位于 `workbench/deepreason/evals/` 和 `scripts/eval_learning_baseline.py`。当前的“语义”检索是轻量词项相似度，“Graph”是词项共现；没有 Embedding、实体多跳图谱或经过测量的全局答案准确率。比较题的计划仅支持三个确定性任务及一次有界本地补查，普通题 Planner 仍是固定文字步骤；只有一条工作流边接入运行时交付契约，名为 `verify` 的上游节点也不核验 Worker 的最终答案。
 
-最新完整回归 **239/239**、十一例入口 **11/11**。普通答案发布新增 **10 项**测试：原三道空泛脚本答复全部扣留，明确正常样例可发布，见[第二十七课](docs/lessons/LEARNING_27_GUIDED_ANSWER_RELEASE.md)。普通生成正常从 3→4 次角色调用，标准止答/拒绝仍 2 次；真实延迟与误拦未测，盲目模型仍可能放行语义错误。路由复核及会话保护分别见[第二十六课](docs/lessons/LEARNING_26_ROUTE_REVIEW_CONTRACT.md)、[第二十五课](docs/lessons/LEARNING_25_SESSION_EXECUTION_AND_COMMIT.md)。没有问答请求幂等、排队或 checkpoint 续跑。
+最新完整回归 **243/243**、十一例入口 **11/11**、七组 Skill 回放 **7/7**。六题和会话/笔记/Skill 操作闭环见[第二十八课](docs/lessons/LEARNING_28_APPLICATION_WALKTHROUGH.md)；修复 Skill 回退后旧候选重新有效的问题，候选同时绑定内容与单调状态修订号，旧待批候选需重新提出。普通生成正常为 4 次角色调用，标准止答/拒绝仍 2 次；真实延迟与误拦未测，盲目模型仍可能放行语义错误。发布、路由及会话保护分别见[第二十七课](docs/lessons/LEARNING_27_GUIDED_ANSWER_RELEASE.md)、[第二十六课](docs/lessons/LEARNING_26_ROUTE_REVIEW_CONTRACT.md)、[第二十五课](docs/lessons/LEARNING_25_SESSION_EXECUTION_AND_COMMIT.md)。没有问答请求幂等、排队或 checkpoint 续跑。
 
 ## 来源
 

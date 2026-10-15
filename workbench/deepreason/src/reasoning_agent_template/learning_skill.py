@@ -73,23 +73,31 @@ class LearningSkillStore:
         db.execute("CREATE TABLE IF NOT EXISTS versions ("
                    "version INTEGER PRIMARY KEY, content_hash TEXT NOT NULL, trigger TEXT NOT NULL, "
                    "instruction TEXT NOT NULL, approved_by TEXT NOT NULL, created_at TEXT NOT NULL)")
-        db.execute("CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY CHECK(id=1), active_version INTEGER NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY CHECK(id=1), "
+                   "active_version INTEGER NOT NULL, revision INTEGER NOT NULL DEFAULT 0)")
         db.execute("CREATE TABLE IF NOT EXISTS candidates ("
                    "candidate_id TEXT PRIMARY KEY, base_hash TEXT NOT NULL, content_hash TEXT NOT NULL, "
                    "trigger TEXT NOT NULL, instruction TEXT NOT NULL, source_note_id TEXT NOT NULL, "
                    "source_body_hash TEXT NOT NULL, source_thread_id TEXT NOT NULL, "
-                   "evaluation TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)")
+                   "evaluation TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, "
+                   "base_revision INTEGER)")
         db.execute("CREATE TABLE IF NOT EXISTS rollbacks ("
                    "id TEXT PRIMARY KEY, from_version INTEGER NOT NULL, to_version INTEGER NOT NULL, "
                    "approved_by TEXT NOT NULL, created_at TEXT NOT NULL)")
         db.execute("INSERT OR IGNORE INTO versions VALUES (0, ?, '', '', 'baseline', ?)",
                    (BASE_HASH, utc_now()))
-        db.execute("INSERT OR IGNORE INTO state VALUES (1, 0)")
+        # A rollback restores content, but must not restore the approval epoch.
+        # Legacy pending candidates have no reliable epoch and need reproposal.
+        if "revision" not in {row[1] for row in db.execute("PRAGMA table_info(state)")}:
+            db.execute("ALTER TABLE state ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+        if "base_revision" not in {row[1] for row in db.execute("PRAGMA table_info(candidates)")}:
+            db.execute("ALTER TABLE candidates ADD COLUMN base_revision INTEGER")
+        db.execute("INSERT OR IGNORE INTO state (id, active_version, revision) VALUES (1, 0, 0)")
 
     @staticmethod
     def _active(db: sqlite3.Connection) -> dict[str, Any]:
         row = db.execute(
-            "SELECT v.version, v.content_hash, v.trigger, v.instruction FROM versions v "
+            "SELECT v.version, v.content_hash, v.trigger, v.instruction, s.revision FROM versions v "
             "JOIN state s ON s.active_version=v.version WHERE s.id=1",
         ).fetchone()
         if row[0] == 0:
@@ -98,14 +106,17 @@ class LearningSkillStore:
             valid = _content_hash(row[2], row[3]) == row[1]
         if not valid:
             raise LearningSkillError("active_content_hash_mismatch")
-        return {"version": row[0], "content_hash": row[1], "trigger": row[2], "instruction": row[3]}
+        return {"version": row[0], "content_hash": row[1], "trigger": row[2], "instruction": row[3],
+                "revision": row[4]}
 
     def active(self) -> dict[str, Any]:
         if not self.path.exists():
-            return {"version": 0, "content_hash": BASE_HASH, "trigger": "", "instruction": ""}
+            return {"version": 0, "content_hash": BASE_HASH, "trigger": "", "instruction": "", "revision": 0}
         with closing(sqlite3.connect(self.path, timeout=10)) as db:
             self._schema(db)
-            return self._active(db)
+            active = self._active(db)
+            db.commit()
+            return active
 
     def instruction_for(self, question: str, *, evidence_ready: bool) -> str:
         active = self.active()
@@ -136,16 +147,19 @@ class LearningSkillStore:
         with closing(sqlite3.connect(self.path, timeout=10)) as db:
             db.execute("BEGIN IMMEDIATE")
             self._schema(db)
-            if self._active(db)["content_hash"] != old["content_hash"]:
+            current = self._active(db)
+            if (current["content_hash"], current["revision"]) != (old["content_hash"], old["revision"]):
                 raise LearningSkillError("active_version_changed_during_proposal")
             db.execute(
-                "INSERT INTO candidates VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'proposed', ?)",
+                "INSERT INTO candidates (candidate_id, base_hash, content_hash, trigger, instruction, "
+                "source_note_id, source_body_hash, source_thread_id, evaluation, status, created_at, "
+                "base_revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'proposed', ?, ?)",
                 (candidate_id, old["content_hash"], content_hash, trigger, instruction,
                  receipt["note_id"], hashlib.sha256(source["body"].encode("utf-8")).hexdigest(),
-                 thread_id, json.dumps(evaluation, ensure_ascii=False), utc_now()),
+                 thread_id, json.dumps(evaluation, ensure_ascii=False), utc_now(), old["revision"]),
             )
             db.commit()
-        return {"candidate_id": candidate_id, "base_hash": old["content_hash"],
+        return {"candidate_id": candidate_id, "base_hash": old["content_hash"], "base_revision": old["revision"],
                 "content_hash": content_hash, "source_note_id": receipt["note_id"],
                 "evaluation": evaluation, "status": "proposed"}
 
@@ -159,7 +173,7 @@ class LearningSkillStore:
             db.execute("BEGIN IMMEDIATE")
             self._schema(db)
             row = db.execute("SELECT base_hash, content_hash, trigger, instruction, evaluation, status, "
-                             "source_note_id, source_body_hash, source_thread_id "
+                             "source_note_id, source_body_hash, source_thread_id, base_revision "
                              "FROM candidates WHERE candidate_id=?", (candidate_id,)).fetchone()
             if row is None or row[5] != "proposed":
                 raise LearningSkillError("candidate_not_pending")
@@ -188,7 +202,9 @@ class LearningSkillStore:
                 raise LearningSkillError("skill_update_gate_rejected")
             evaluation = json.loads(row[4])
             active = self._active(db)
-            if active["content_hash"] != row[0]:
+            if row[9] is None:
+                raise LearningSkillError("candidate_requires_reproposal")
+            if active["content_hash"] != row[0] or active["revision"] != row[9]:
                 raise LearningSkillError("base_version_changed")
             if evaluation != _evaluate(active["trigger"], row[2]):
                 raise LearningSkillError("candidate_evaluation_changed")
@@ -197,10 +213,11 @@ class LearningSkillStore:
             version = int(db.execute("SELECT MAX(version) FROM versions").fetchone()[0]) + 1
             db.execute("INSERT INTO versions VALUES (?, ?, ?, ?, ?, ?)",
                        (version, row[1], row[2], row[3], approved_by.strip(), utc_now()))
-            db.execute("UPDATE state SET active_version=? WHERE id=1", (version,))
+            db.execute("UPDATE state SET active_version=?, revision=revision+1 WHERE id=1", (version,))
             db.execute("UPDATE candidates SET status='applied' WHERE candidate_id=?", (candidate_id,))
             db.commit()
         return {"status": "applied", "version": version, "content_hash": row[1],
+                "revision": active["revision"] + 1,
                 "gate_decision": gate.to_dict()}
 
     def rollback(self, target_version: int, *, expected_current_hash: str,
@@ -234,9 +251,10 @@ class LearningSkillStore:
             )
             if gate.status != "allow":
                 raise LearningSkillError("skill_rollback_gate_rejected")
-            db.execute("UPDATE state SET active_version=? WHERE id=1", (target_version,))
+            db.execute("UPDATE state SET active_version=?, revision=revision+1 WHERE id=1", (target_version,))
             db.execute("INSERT INTO rollbacks VALUES (?, ?, ?, ?, ?)",
                        (uuid.uuid4().hex, current["version"], target_version, approved_by.strip(), utc_now()))
             db.commit()
         return {"status": "rolled_back", "version": target_version, "content_hash": target[0],
+                "revision": current["revision"] + 1,
                 "gate_decision": gate.to_dict()}

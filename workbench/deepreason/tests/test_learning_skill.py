@@ -159,6 +159,78 @@ class LearningSkillTests(unittest.TestCase):
         state.gate_decisions[-1] = GateDecision(gate_id="g", risk_level="medium", status="deny", reasons=[])
         self.assertNotIn("已审批教学 Skill", prompt(comparison))
 
+    def test_rollback_does_not_revalidate_a_stale_candidate_with_the_same_base_hash(self):
+        first = self.skills.propose_from_note(thread_id="learner", operation_id="feedback-1",
+                                              feedback_kind="missing_preconditions")
+        stale = self.skills.propose_from_note(thread_id="learner", operation_id="feedback-1",
+                                              feedback_kind="missing_preconditions")
+        applied = self.skills.approve(first["candidate_id"], expected_hash=first["content_hash"],
+                                      approved_by="local")
+        restored = self.skills.rollback(0, expected_current_hash=applied["content_hash"], approved_by="local")
+        self.assertEqual(restored["content_hash"], stale["base_hash"])
+        self.assertEqual(restored["revision"], 2)
+        with self.assertRaisesRegex(LearningSkillError, "base_version_changed"):
+            LearningSkillStore(self.root).approve(stale["candidate_id"], expected_hash=stale["content_hash"],
+                                                  approved_by="local")
+        self.assertEqual(self.skills.active()["version"], 0)
+        fresh = self.skills.propose_from_note(thread_id="learner", operation_id="feedback-1",
+                                              feedback_kind="missing_preconditions")
+        self.assertEqual(fresh["base_revision"], 2)
+        reapplied = self.skills.approve(fresh["candidate_id"], expected_hash=fresh["content_hash"],
+                                        approved_by="local")
+        self.assertEqual((reapplied["version"], reapplied["revision"]), (2, 3))
+
+    def test_identical_content_in_a_new_version_still_invalidates_pending_candidates(self):
+        first = self.skills.propose_from_note(thread_id="learner", operation_id="feedback-1",
+                                              feedback_kind="missing_preconditions")
+        self.skills.approve(first["candidate_id"], expected_hash=first["content_hash"], approved_by="local")
+        second = self.skills.propose_from_note(thread_id="learner", operation_id="feedback-1",
+                                               feedback_kind="missing_preconditions")
+        stale = self.skills.propose_from_note(thread_id="learner", operation_id="feedback-1",
+                                              feedback_kind="missing_preconditions")
+        self.skills.approve(second["candidate_id"], expected_hash=second["content_hash"], approved_by="local")
+        self.assertEqual(self.skills.active()["content_hash"], stale["base_hash"])
+        with self.assertRaisesRegex(LearningSkillError, "base_version_changed"):
+            self.skills.approve(stale["candidate_id"], expected_hash=stale["content_hash"], approved_by="local")
+
+    def test_legacy_database_preserves_active_content_but_pending_candidates_need_reproposal(self):
+        first = self.skills.propose_from_note(thread_id="learner", operation_id="feedback-1",
+                                              feedback_kind="missing_preconditions")
+        self.skills.approve(first["candidate_id"], expected_hash=first["content_hash"], approved_by="local")
+        pending = self.skills.propose_from_note(thread_id="learner", operation_id="feedback-1",
+                                                feedback_kind="missing_preconditions")
+        with closing(sqlite3.connect(self.skills.path)) as db:
+            db.execute("ALTER TABLE state DROP COLUMN revision")
+            db.execute("ALTER TABLE candidates DROP COLUMN base_revision")
+            db.commit()
+        reopened = LearningSkillStore(self.root)
+        self.assertEqual((reopened.active()["version"], reopened.active()["revision"]), (1, 0))
+        self.assertEqual(reopened.active()["content_hash"], first["content_hash"])
+        with self.assertRaisesRegex(LearningSkillError, "candidate_requires_reproposal"):
+            reopened.approve(pending["candidate_id"], expected_hash=pending["content_hash"], approved_by="local")
+        fresh = reopened.propose_from_note(thread_id="learner", operation_id="feedback-1",
+                                           feedback_kind="missing_preconditions")
+        applied = reopened.approve(fresh["candidate_id"], expected_hash=fresh["content_hash"], approved_by="local")
+        self.assertEqual((applied["version"], applied["revision"]), (2, 1))
+
+    def test_state_change_and_rollback_during_proposal_cannot_hide_behind_the_same_hash(self):
+        first = self.skills.propose_from_note(thread_id="learner", operation_id="feedback-1",
+                                              feedback_kind="missing_preconditions")
+        real_active = self.skills.active
+
+        def interleave():
+            old = real_active()
+            self.skills.approve(first["candidate_id"], expected_hash=first["content_hash"], approved_by="local")
+            self.skills.rollback(0, expected_current_hash=first["content_hash"], approved_by="local")
+            return old
+
+        with patch.object(self.skills, "active", side_effect=interleave), self.assertRaisesRegex(
+            LearningSkillError, "active_version_changed_during_proposal",
+        ):
+            self.skills.propose_from_note(thread_id="learner", operation_id="feedback-1",
+                                          feedback_kind="missing_preconditions")
+        self.assertEqual(self.skills.active()["revision"], 2)
+
     def test_full_comparison_run_loads_approved_skill_and_rollback_removes_it(self):
         shutil.copytree(CORPUS, self.root / "knowledge")
         (self.root / "knowledge" / "shape_definitions.md").write_text(
