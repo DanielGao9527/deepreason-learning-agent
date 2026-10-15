@@ -149,9 +149,7 @@ class MultiAgentOrchestrator:
                 long_term_memory=long_term_before,
             )
             events.extend(reviewer_events)
-            workflow_goal = str(routing_decision.get("retrieval_query") or "").strip()
-            if not workflow_goal:
-                workflow_goal = _contextual_goal_for_evidence_followup(message, short_term_before)
+            workflow_goal = self._workflow_goal(message, routing_decision, short_term_before)
             self._set_active_phase(
                 run_id=run_id,
                 thread_id=thread_id,
@@ -1588,6 +1586,11 @@ class MultiAgentOrchestrator:
                 )
         raise RuntimeError("unreachable retry state")
 
+    def _workflow_goal(self, message: str, routing_decision: dict, short_term_memory: list) -> str:
+        return str(routing_decision.get("retrieval_query") or "").strip() or _contextual_goal_for_evidence_followup(
+            message, short_term_memory,
+        )
+
     def _should_review_output(self, state: AgentState, llm_status: dict[str, Any]) -> bool:
         """Generic callers retain their configured strict-evidence review policy."""
         return bool(self.config.runtime.get("output_review_enabled", False)
@@ -1638,7 +1641,16 @@ class MultiAgentOrchestrator:
                     "per point_id: point_id, status=covered|missing|unsupported, and draft_excerpt "
                     "copied exactly from the draft for covered items. Mark issue if any point is "
                     "missing or unsupported. Each covered point needs its own distinct excerpt. "
-                    "Copy review_context_hash exactly from the request into the review JSON."
+                    "Copy review_context_hash exactly from the request into the review JSON. "
+                    "Never rename the required claim keys, especially claim_id. A supported receipt must "
+                    "have this exact shape (replace all placeholder values with the current request's data): "
+                    '{"review_status":"supported","coverage_complete":true,"findings":[], '
+                    '"review_context_hash":"copy from request", '
+                    '"claims":[{"claim_id":"c1","statement":"claim from draft", '
+                    '"evidence_id":"copy from qualified_sources","excerpt":"exact source text"}], '
+                    '"coverage":[{"point_id":"copy requirement id","status":"covered", '
+                    '"draft_excerpt":"exact draft text"}]}. '
+                    "Include all required coverage points and all material claims, not just the example item."
                 ),
             ),
             ChatMessage(

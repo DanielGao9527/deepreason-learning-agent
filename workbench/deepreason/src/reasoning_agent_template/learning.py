@@ -32,7 +32,7 @@ from reasoning_agent_template.workflow import TemplateCoordinator, WorkflowContr
 
 
 DEFAULT_WORKSPACE = Path(__file__).resolve().parents[2] / "learning_mvp"
-DEFAULT_QWEN_MODEL = "qwen3.7-plus"
+DEFAULT_QWEN_MODEL = "qwen-max"
 DEFAULT_QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 MAX_QWEN_CALLS = 100
 USAGE_DB = DEFAULT_WORKSPACE / "local_state" / "qwen_usage.sqlite3"
@@ -183,6 +183,33 @@ def _local_learning_route(route: dict[str, Any], question: str) -> dict[str, Any
     return result
 
 
+def _learning_route_prompt(user: str, *, reviewer: bool) -> str:
+    """Show valid JSON, rather than pipe-delimited values that models can copy."""
+    example = {
+        "difficulty": "simple", "workflow": "evidence_soft", "evidence_mode": "required",
+        "evidence_strictness": "soft", "risk_level": "medium", "category": "technical_claim",
+        "sources": ["rag"], "reasons": ["需要本地课程证据"], "confidence": 0.8,
+    }
+    allowed = {
+        "difficulty": sorted(DIFFICULTY_ORDER), "risk_level": sorted(RISK_ORDER),
+        "evidence_strictness": sorted(STRICTNESS_ORDER), "evidence_mode": ["optional", "required"],
+        "workflow": ["routine", "evidence_soft", "evidence_strict", "protected_action"],
+        "category": ["routine", "scientific_claim", "technical_claim", "academic", "decision_analysis",
+                     "regulated_domain", "high_risk_action", "current_factual", "explicit_evidence_request", "hard_reasoning"],
+        "sources": ["rag"],
+    }
+    if reviewer:
+        example.update(review_status="approve", findings=[])
+        allowed["review_status"] = ["approve", "escalate", "revise"]
+    prefix = "REVIEW_DECISION_JSON" if reviewer else "ROUTING_DECISION_JSON"
+    suffix = user[user.index("\n\n用户输入:"):]
+    return (prefix + " schema:\n" + json.dumps(example, ensure_ascii=False) +
+            "\n\n上面是合法形状示例，请按实际问题填值，不能盲目复制。各字段允许值如下；"
+            "sources 是数组，其余枚举只能选择单个字符串，不允许用竖线拼接。"
+            "retrieval_query 是可选检索改写字段，不需要改写时省略。\n" +
+            json.dumps(allowed, ensure_ascii=False) + suffix)
+
+
 def _explicit_comparison_subjects(question: str) -> tuple[str, str] | None:
     """Recognize a small set of explicit Chinese A/B distinction questions."""
     match = re.search(
@@ -225,7 +252,18 @@ class LearningTemplateCoordinator(TemplateCoordinator):
 
     def _retrieve(self, state: AgentState) -> None:
         if not state.execution_plan:
-            super()._retrieve(state)
+            original_goal = state.user_goal
+            query = str(state.routing_decision.get("retrieval_query") or original_goal).strip()
+            state.stage_events.append({
+                "time": utc_now(), "agent": "retriever", "stage": "retrieve",
+                "kind": "learning_retrieval_query", "retrieval_query": query,
+                "message": "检索改写仅用于查资料，门禁仍检查原始用户目标。",
+            })
+            try:
+                state.user_goal = query
+                super()._retrieve(state)
+            finally:
+                state.user_goal = original_goal
             return
         tasks = ordered_plan_tasks(state.execution_plan)
         knowledge_root = Path(self.config.knowledge["directory"])
@@ -440,6 +478,11 @@ class LearningOrchestrator(MultiAgentOrchestrator):
             config=self.config, workspace_root=self.workspace_root, event_callback=event_callback,
         )
 
+    def _workflow_goal(self, message: str, routing_decision: dict, short_term_memory: list) -> str:
+        # Search rewrites must not replace the goal checked by gates or plans.
+        routing_decision["retrieval_query"] = super()._workflow_goal(message, routing_decision, short_term_memory)
+        return message
+
     def _write_explicit_long_term_memory(self, message: str) -> list[Any]:
         # MVP only restores recent turns. A learning question or one user's wording
         # must not silently become a durable learner profile.
@@ -455,11 +498,13 @@ class LearningOrchestrator(MultiAgentOrchestrator):
             "只用本地课程语料，不要求外部网页或论文。"
         )
         messages[0] = ChatMessage(role="system", content=messages[0].content + guide)
+        messages[-1] = ChatMessage(role="user", content=_learning_route_prompt(messages[-1].content, reviewer=False))
         return messages
 
     def _reviewer_messages(self, message: str, coordinator_route: dict[str, Any], *, short_term_memory, long_term_memory):
         messages = super()._reviewer_messages(
-            message, coordinator_route, short_term_memory=short_term_memory, long_term_memory=long_term_memory
+            message, {key: value for key, value in coordinator_route.items() if key in ROUTE_KEYS},
+            short_term_memory=short_term_memory, long_term_memory=long_term_memory
         )
         messages[0] = ChatMessage(
             role="system",
@@ -468,8 +513,12 @@ class LearningOrchestrator(MultiAgentOrchestrator):
                 "严格遵守给定字段和枚举，必须包含 review_status 和字符串数组 findings。"
                 "approve 时 findings 必须为空；有问题请用 escalate 或 revise，给出 findings 和更严格的路由字段。"
                 "不要只写建议文字，也不要用无法提升审查强度的修改表示复核已完成。"
+                "枚举字段只能取 schema 列出的一个值，禁止照抄带竖线的候选列表或拼接多个值。"
+                "输出全新对象，每个字段只出现一次，不要复制上游对象后追加同名字段。"
+                "只返回约定的路由字段、review_status 和 findings；不要返回 source、learning_policy 等运行元数据。"
             ),
         )
+        messages[-1] = ChatMessage(role="user", content=_learning_route_prompt(messages[-1].content, reviewer=True))
         return messages
 
     def _parse_route_review(self, content: str) -> dict[str, Any]:

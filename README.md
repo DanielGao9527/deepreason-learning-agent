@@ -31,10 +31,11 @@ py -3.12 -m venv .venv
 离线演示会直接展示六题回答，再检查新进程恢复会话、笔记重复提交及 Skill 候选/审批/回退。每次保留独立的 `artifacts/demos/learning-*/`：`README.md` 是实际命令与回执，`report.json` 是完整轨迹。它使用脚本模型，不需要 API Key，不代表真实答案质量；详见[第二十八课](docs/lessons/LEARNING_28_APPLICATION_WALKTHROUGH.md)。要实际连续提问，请在**本机环境变量**中设置 `DEEPREASON_QWEN_API_KEY` 或 `DASHSCOPE_API_KEY`，然后运行：
 
 ```powershell
+$env:DEEPREASON_QWEN_MODEL='qwen-max'
 .\.venv\Scripts\python.exe run_learning.py
 ```
 
-输入 `/usage` 查看已预占的真实请求次数，`/exit` 退出。不要把 Key 写入仓库；`.env.example` 仅列出配置名，程序不会自动读取它。`workbench/deepreason/learning_mvp/knowledge/` 是小型教学语料，并非完整计算机知识库。
+当前默认使用维护者已实测可用的 `qwen-max`；上面一行也能覆盖终端里残留的旧模型选择。输入 `/usage` 查看已预占的真实请求次数，`/exit` 退出。不要把 Key 写入仓库；`.env.example` 仅列出配置名，程序不会自动读取它。`workbench/deepreason/learning_mvp/knowledge/` 是小型教学语料，并非完整计算机知识库。
 
 学习笔记无需模型配置。先运行 `.\.venv\Scripts\python.exe run_learning.py --notes --thread note-demo` 查看当前版本；若为 0，运行 `.\.venv\Scripts\python.exe run_learning.py --save-note "复习哈希冲突" --thread note-demo --operation-id note-001 --expected-version 0` 保存，再用 `--note-receipt note-001 --thread note-demo` 核对。超时后保留原操作 ID 和正文；具体实验见[第十九课](docs/lessons/LEARNING_19_TOOL_EXECUTION_ASSURANCE.md)。笔记只按本地 thread 命名空间隔离，没有登录用户认证，也不会自动变成长期画像或 Skill。
 
@@ -59,7 +60,7 @@ $env:PYTHONPATH='src'
 
 最近一次完整回归及已观察的失败记录见[项目状态](docs/PROJECT_STATUS.md)。评测题与无模型诊断器分别位于 `workbench/deepreason/evals/` 和 `scripts/eval_learning_baseline.py`。当前的“语义”检索是轻量词项相似度，“Graph”是词项共现；没有 Embedding、实体多跳图谱或经过测量的全局答案准确率。比较题的计划仅支持三个确定性任务及一次有界本地补查，普通题 Planner 仍是固定文字步骤；只有一条工作流边接入运行时交付契约，名为 `verify` 的上游节点也不核验 Worker 的最终答案。
 
-最新完整回归 **243/243**、十一例入口 **11/11**、七组 Skill 回放 **7/7**。六题和会话/笔记/Skill 操作闭环见[第二十八课](docs/lessons/LEARNING_28_APPLICATION_WALKTHROUGH.md)；修复 Skill 回退后旧候选重新有效的问题，候选同时绑定内容与单调状态修订号，旧待批候选需重新提出。普通生成正常为 4 次角色调用，标准止答/拒绝仍 2 次；真实延迟与误拦未测，盲目模型仍可能放行语义错误。发布、路由及会话保护分别见[第二十七课](docs/lessons/LEARNING_27_GUIDED_ANSWER_RELEASE.md)、[第二十六课](docs/lessons/LEARNING_26_ROUTE_REVIEW_CONTRACT.md)、[第二十五课](docs/lessons/LEARNING_25_SESSION_EXECUTION_AND_COMMIT.md)。没有问答请求幂等、排队或 checkpoint 续跑。
+最新完整回归 **249/249**、十一例入口 **11/11**、七组 Skill 回放 **7/7**。真实 qwen-max 服务已跑通，但固定六题仍未全部通过；调用累计 **67/100**，失败、修复与真实边界见[第二十九课](docs/lessons/LEARNING_29_REAL_QWEN_AND_GOAL_BOUNDARY.md)。六题和会话/笔记/Skill 操作闭环见[第二十八课](docs/lessons/LEARNING_28_APPLICATION_WALKTHROUGH.md)；修复 Skill 回退后旧候选重新有效的问题，候选同时绑定内容与单调状态修订号，旧待批候选需重新提出。普通生成正常为 4 次角色调用，标准止答/拒绝仍 2 次；已测首个成功题约 40.991 秒，尚无提速结论；真实误拦率与总体质量未验收，盲目模型仍可能放行语义错误。发布、路由及会话保护分别见[第二十七课](docs/lessons/LEARNING_27_GUIDED_ANSWER_RELEASE.md)、[第二十六课](docs/lessons/LEARNING_26_ROUTE_REVIEW_CONTRACT.md)、[第二十五课](docs/lessons/LEARNING_25_SESSION_EXECUTION_AND_COMMIT.md)。没有问答请求幂等、排队或 checkpoint 续跑。
 
 ## 来源
 
