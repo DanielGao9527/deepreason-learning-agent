@@ -107,3 +107,11 @@
 - tests/test_learning_experiment.py：17 项针对性测试；完整副本 206/206。正常离线 16 次（route 6、reviewer 6、worker 4）且 Skill 加载 1 次，限额 2 时只转交 2 次、拒绝第三次。六份答复未独立评分，token 与真实效果未测，千问调用 0。
 
 课程及评分方法见 lab 的 docs/lessons/LEARNING_24_PAIRED_QUALITY_AND_COST_EXPERIMENT.md；未把模拟评分或未知 usage 写成真实收益。
+
+第二十五课新增**学习入口的本地会话执行与提交保护**，固定上游未改：
+
+- `src/reasoning_agent_template/learning_sessions.py`：继承上游 SessionStore 的格式、路径校验和加载；新增稳定路径哈希锁文件、Windows/Unix 非阻塞文件锁和临时快照替换。只有 Windows 分支完成实际测试。
+- `learning.py`：学习编排器增加实例互斥、整轮会话锁、获锁后的历史重载及退出时清理缓存；学习助手使用新存储适配器，CLI 与交互模式友好返回忙碌。上游 `multiagent.py`、`sessions.py` 未因本课修改。
+- `tests/test_learning_sessions.py`：14 项故障/回归测试；A→B→A 三轮改前快照只剩 2 轮，改后保留 3 轮，第三轮路由消费前两轮；包含跨进程提交/竞争、Worker 阶段终止进程与替换失败。完整副本 220/220，九例入口 9/9。
+
+同轮真实千问对照在第一条 route 请求 HTTP 403 后停止，无评分包；仓库预占 14→15/100。会话增强的实现和测试均无额外真实模型调用。课程及限制见 lab 的 `docs/lessons/LEARNING_25_SESSION_EXECUTION_AND_COMMIT.md`；不宣称通用并行平台、问答幂等或 checkpoint 续跑。

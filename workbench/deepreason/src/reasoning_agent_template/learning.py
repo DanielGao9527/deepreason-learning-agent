@@ -10,6 +10,7 @@ import re
 import sqlite3
 import tempfile
 from pathlib import Path
+from threading import Lock
 from typing import Any, Sequence
 
 from reasoning_agent_template.config import AgentConfig
@@ -17,11 +18,13 @@ from reasoning_agent_template.llm import ChatMessage, ChatResult, DeepSeekChatCl
 from reasoning_agent_template.learning_plan import LearningPlanError, build_comparison_plan, ordered_plan_tasks
 from reasoning_agent_template.learning_notes import LearningNoteStore, execute_learning_note_command
 from reasoning_agent_template.learning_skill import LearningSkillError, LearningSkillStore
+from reasoning_agent_template.learning_sessions import (
+    LearningSessionBusyError, LearningSessionStore, session_execution_guard,
+)
 from reasoning_agent_template.knowledge import LocalKnowledgeBase, SUPPORTED_EXTENSIONS
 from reasoning_agent_template.models import AgentState, utc_now
-from reasoning_agent_template.multiagent import MultiAgentOrchestrator
+from reasoning_agent_template.multiagent import MultiAgentOrchestrator, _normalize_thread_id
 from reasoning_agent_template.risk import classify_evidence_requirement
-from reasoning_agent_template.sessions import SessionStore
 from reasoning_agent_template.workflow import TemplateCoordinator, WorkflowContractError
 
 
@@ -311,6 +314,30 @@ class LearningTemplateCoordinator(TemplateCoordinator):
 
 
 class LearningOrchestrator(MultiAgentOrchestrator):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Upstream active-run status is one slot, so a single instance cannot run
+        # two threads concurrently even if they use different session files.
+        self._execution_lock = Lock()
+
+    def run(self, message: str, *, thread_id: str = "default") -> dict[str, Any]:
+        if not self._execution_lock.acquire(blocking=False):
+            raise LearningSessionBusyError("assistant_busy")
+        thread_id = _normalize_thread_id(thread_id)
+        try:
+            if self.session_store is None:
+                return super().run(message, thread_id=thread_id)
+            with session_execution_guard(self.session_store, thread_id):
+                # Another instance/process may have committed since our last
+                # request. A cached history would overwrite that newer turn.
+                self.short_term_memories.pop(thread_id, None)
+                return super().run(message, thread_id=thread_id)
+        finally:
+            if self.session_store is not None:
+                # Failed snapshot writes must not leave uncommitted turns cached.
+                self.short_term_memories.pop(thread_id, None)
+            self._execution_lock.release()
+
     def _before_publish(self, state: AgentState) -> None:
         self._check_plan_source_version(state)
 
@@ -524,7 +551,7 @@ class LearningAssistant:
             config=self.config,
             workspace_root=self.workspace,
             llm_client_factory=lambda _config: self._client(),
-            session_store=SessionStore(self.workspace / "sessions"),
+            session_store=LearningSessionStore(self.workspace / "sessions"),
         )
 
     def _client(self):
@@ -667,7 +694,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("请提供学习问题，或使用 --interactive 连续提问。")
     try:
         payload = LearningAssistant(args.workspace).ask(" ".join(args.question), thread_id=args.thread)
-    except (MissingApiKeyError, QwenCallLimitError, WorkflowContractError, LearningPlanError) as exc:
+    except (MissingApiKeyError, QwenCallLimitError, WorkflowContractError, LearningPlanError,
+            LearningSessionBusyError) as exc:
         parser.exit(2, str(exc) + "\n")
     except LLMRequestError as exc:
         parser.exit(2, f"模型请求失败：{exc}。本轮未生成回答。\n")
@@ -737,7 +765,8 @@ def interactive_session(assistant: LearningAssistant, *, thread_id: str = "defau
         before = BudgetedQwenClient.calls_used_at(USAGE_DB)
         try:
             payload = assistant.ask(question, thread_id=thread_id)
-        except (MissingApiKeyError, QwenCallLimitError, LLMRequestError, WorkflowContractError, LearningPlanError) as exc:
+        except (MissingApiKeyError, QwenCallLimitError, LLMRequestError, WorkflowContractError,
+                LearningPlanError, LearningSessionBusyError) as exc:
             print(f"本轮失败（{type(exc).__name__}）：{exc}")
         except Exception as exc:
             print(f"本轮失败（{type(exc).__name__}）。本次未得到可交付答案；请检查配置或用测试复现。")

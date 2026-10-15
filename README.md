@@ -10,7 +10,7 @@
 - 学习严格题的最终审查按问题明示维度要求逐项覆盖清单和草稿原文摘录；程序核对清单、当前问题/草稿/证据版本与既有引用结构，缺项扣稿。程序不能独立判断摘录是否语义充分。
 - 对少数显式双主体比较题执行三步确定性证据计划：分别查询两个主体并汇合候选；若前四条候选排满却缺主体，最多扩大一次 Top-K，仍缺资料就跳过 Worker。任务 ID、依赖、处理器、步数与检索预算在运行前检查；源文件中途变化会阻断发布。
 - 坏计划、交付契约失败与模型不可用会留下脱敏的本地失败终态；失败文件不包含问题或模型正文，也不等于自动续跑。
-- 按 thread 恢复近期会话；本机 SQLite 在发送真实千问请求前预占名额，默认总上限为 100 次。
+- 按 thread 恢复近期会话；学习入口用本地跨进程锁保护整轮读取、执行和提交，每轮重载已提交历史，快照替换失败保留旧文件。同实例或同会话忙碌时明确拒绝第二请求。本机 SQLite 在发送真实千问请求前预占名额，默认总上限为 100 次。
 - 明确保存和查看本地学习笔记：写入通过上游工具门禁与 SQLite 持久回执，同一操作 ID 可在重启或响应丢失后安全核对；不会从普通提问自动写笔记。
 - 对“比较题缺少成立前提”的明确反馈，可生成一条教学 Skill 候选；三例触发对照、内容哈希和旧版检查通过后，显式批准才会影响证据齐全的比较题 Worker 提示，可回退。当前仅是一个固定规则实验。
 
@@ -43,7 +43,7 @@ py -3.12 -m venv .venv
 
 答案级离线诊断可运行 `.\.venv\Scripts\python.exe scripts\eval_learning_answers.py`。六题区分合格资料是否出现、答复字面要点是否覆盖及严格题是否扣稿；标签未经独立人工复核，字面检查不是语义准确率。缺口与发布契约分别见[第二十二课](docs/lessons/LEARNING_22_ANSWER_QUALITY_PROBE.md)、[第二十三课](docs/lessons/LEARNING_23_STRICT_ANSWER_COVERAGE_CONTRACT.md)。
 
-三组 Skill 答案/代价对照入口为 `.\.venv\Scripts\python.exe scripts\run_learning_experiment.py`，默认只显示计划；加 `--offline` 才执行脚本实验，并在 `artifacts/experiments/` 留下六份隐藏版本标签的答复复核包与待填评分表。逐次记录角色、失败、token 与耗时，缺 usage 或人工评分时保持未测。真实千问必须显式加 `--qwen`，另有本轮请求限额；接线已离线验证，真实入口尚未实测。内容绑定评分与使用方法见[第二十四课](docs/lessons/LEARNING_24_PAIRED_QUALITY_AND_COST_EXPERIMENT.md)。
+三组 Skill 答案/代价对照入口为 `.\.venv\Scripts\python.exe scripts\run_learning_experiment.py`，默认只显示计划；加 `--offline` 才执行脚本实验，并在 `artifacts/experiments/` 留下六份隐藏版本标签的答复复核包与待填评分表。逐次记录角色、失败、token 与耗时，缺 usage 或人工评分时保持未测。真实千问必须显式加 `--qwen`，另有本轮请求限额；2026-10-15 实测第一条请求 HTTP 403 即停止，只新增 1 次预占，没有可评分答案。内容绑定评分与使用方法见[第二十四课](docs/lessons/LEARNING_24_PAIRED_QUALITY_AND_COST_EXPERIMENT.md)。
 
 ## 验证与边界
 
@@ -57,6 +57,8 @@ $env:PYTHONPATH='src'
 ```
 
 最近一次完整回归及已观察的失败记录见[项目状态](docs/PROJECT_STATUS.md)。评测题与无模型诊断器分别位于 `workbench/deepreason/evals/` 和 `scripts/eval_learning_baseline.py`。当前的“语义”检索是轻量词项相似度，“Graph”是词项共现；没有 Embedding、实体多跳图谱或经过测量的全局答案准确率。比较题的计划仅支持三个确定性任务及一次有界本地补查，普通题 Planner 仍是固定文字步骤；只有一条工作流边接入运行时交付契约，名为 `verify` 的上游节点也不核验 Worker 的最终答案。
+
+会话保护的针对性测试 **14/14**、完整回归 **220/220**；A→B→A 三轮交错案例从只保留两轮变为三轮完整保留。跨进程竞争、持锁进程退出和快照提交失败的复现见[第二十五课](docs/lessons/LEARNING_25_SESSION_EXECUTION_AND_COMMIT.md)。范围是本地学习入口，没有问答请求幂等、排队或 checkpoint 续跑。
 
 ## 来源
 
