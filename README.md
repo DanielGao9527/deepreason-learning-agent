@@ -1,72 +1,85 @@
 # DeepReason Learning Agent
 
-基于 [DeepReason Agents Framework](https://github.com/redmaplewww/DeepReason-Agents-Framework) 的计算机知识学习与推论助手。这个仓库保留了可运行的 Python 工作副本，并围绕多角色路由、证据交付、门禁和发布控制做小范围改造。它是 AI 应用开发的学习与评测项目，不是原框架的官方版本。
+面向计算机基础知识的本地学习助手。基于 [DeepReason Agents Framework](https://github.com/redmaplewww/DeepReason-Agents-Framework) 的 Python 运行核心，围绕多角色任务路由、证据交付、答案发布控制、会话一致性与教学 Skill 更新进行改造。
 
-**当前产品尚不可用。** 固定同版本真实验收中，四道有资料、预期回答的正常题只有 **1/4 发布**；另两道是应停止题，单独统计。离线回归通过不代表实际问答成功。当前优先修复正常问答的协议交接与失败归因，详情见[项目状态](docs/PROJECT_STATUS.md)。
+提供终端连续问答、概念解释与条件比较的实验流程；回答使用本地课程资料，资料不足时明确止答。当前聚焦树与哈希等小范围知识，核心工程机制已接通，真实问答质量仍在收尾验收。
 
-## 当前能做什么
+## 核心机制
 
-- 在 PowerShell 中连续提问；概念解释与条件比较采用不同证据强度，所有实际生成的学习答复均经过最终审查。
-- 从七份带来源的本地课程资料检索。学习场景在 `retrieve → reason` 交付前核对片段、源文件、哈希和 Evidence Ledger；资料不足时止答。
-- 对明确高风险请求增加只升级的路由下限。Gate 未放行或严格题最终审查失败时，扣留草稿，只交付可公开说明。
-- 路由 Reviewer 的原始回执先校验必需字段、状态和取值，再合并路线；坏 JSON、空对象、重复字段或无法应用的修订在检索和 Worker 前中断，不保存该轮会话。
-- 最终审查按问题明示维度要求覆盖清单和草稿原文摘录，普通概念题至少包含直接回答与原理；程序核对清单、当前问题/草稿/证据版本与引用结构，缺项扣稿。未调用 Worker 的标准止答/拒绝不追加审查；程序不能证明语义正确。
-- 对少数显式双主体比较题执行三步确定性证据计划：分别查询两个主体并汇合候选；若前四条候选排满却缺主体，最多扩大一次 Top-K，仍缺资料就跳过 Worker。任务 ID、依赖、处理器、步数与检索预算在运行前检查；源文件中途变化会阻断发布。
-- 坏计划、交付契约失败与模型不可用会留下脱敏的本地失败终态；失败文件不包含问题或模型正文，也不等于自动续跑。
-- 按 thread 恢复近期会话；学习入口用本地跨进程锁保护整轮读取、执行和提交，每轮重载已提交历史，快照替换失败保留旧文件。同实例或同会话忙碌时明确拒绝第二请求。本机 SQLite 在发送真实千问请求前预占名额，默认总上限为 100 次。
-- 明确保存和查看本地学习笔记：写入通过上游工具门禁与 SQLite 持久回执，同一操作 ID 可在重启或响应丢失后安全核对；不会从普通提问自动写笔记。
-- 对“比较题缺少成立前提”的明确反馈，可生成一条教学 Skill 候选；三例触发对照、内容哈希和旧版检查通过后，显式批准才会影响证据齐全的比较题 Worker 提示，可回退。当前仅是一个固定规则实验。
+| 机制 | 当前实现 |
+| --- | --- |
+| 多角色工作流 | Coordinator 判断任务与风险，Reviewer 复核且只升级审查强度；明确的双主体比较采用两侧检索与证据汇合的有限计划，检查依赖、步数和交付条件 |
+| 证据与发布控制 | 本地检索结合 BM25、词项相似度和共现扩展；Gate 检查证据资格，生成草稿再经过最终审查，并核对引用 ID、源哈希、原文摘录和问题维度后发布 |
+| 会话与笔记可靠性 | 按线程保存近期历史；跨进程锁、获锁重载和快照替换保护会话提交；明确笔记写入使用 SQLite 操作回执与版本检查，支持重复提交核对 |
+| 受控 Skill 更新 | 从明确反馈生成固定教学规则候选，经过触发案例检查、来源与版本绑定及人工审批后加载，支持回退 |
 
-上述能力的归属及限制见[改动清单](workbench/PROVENANCE.md)和[项目状态](docs/PROJECT_STATUS.md)；下一阶段按[开发路径](docs/DEVELOPMENT_PATH.md)推进。上游的工作流、检索器和 SessionStore 是复用代码；本项目的学习场景、交付检查、发布保护及评测由维护者与 AI 协作完成。
+```text
+问题与本线程历史
+  → 路由与复核
+  → 有限计划与本地检索
+  → 证据审计与 Gate
+  → Worker 生成草稿
+  → 最终审查与引用核验
+  → 发布结果并保存会话
+```
 
-## 运行
+Gate 阻断或资料不足时跳过 Worker；审查失败时扣留草稿。角色当前按流程串行执行。
 
-需要 Python 3.11+。在仓库根目录的 PowerShell 中：
+## 快速开始
+
+需要 Python 3.11 或更新版本。下面以 Windows PowerShell 和 Python 3.12 为例，在仓库根目录运行：
 
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe run_learning.py --usage
+```
+
+### 无需模型密钥的演示
+
+```powershell
 .\.venv\Scripts\python.exe scripts\learning_mvp_demo.py
 ```
 
-离线演示会直接展示六题回答，再检查新进程恢复会话、笔记重复提交及 Skill 候选/审批/回退。每次保留独立的 `artifacts/demos/learning-*/`：`README.md` 是实际命令与回执，`report.json` 是完整轨迹。它使用脚本模型，不需要 API Key，不代表真实答案质量；详见[第二十八课](docs/lessons/LEARNING_28_APPLICATION_WALKTHROUGH.md)。要实际连续提问，请在**本机环境变量**中设置 `DEEPREASON_QWEN_API_KEY` 或 `DASHSCOPE_API_KEY`，然后运行：
+演示会展示六道代表题，并实际执行会话重启恢复、笔记重复提交，以及 Skill 提出、批准和回退。模型回答与审查由固定脚本提供，工作流、检索和存储实际执行。每次使用独立结果目录，不改现有学习会话。
+
+### 使用千问连续问答
+
+先在本机环境变量中配置 `DEEPREASON_QWEN_API_KEY` 或 `DASHSCOPE_API_KEY`，再运行：
 
 ```powershell
 $env:DEEPREASON_QWEN_MODEL='qwen-max'
 .\.venv\Scripts\python.exe run_learning.py
 ```
 
-当前默认使用维护者已实测可用的 `qwen-max`；上面一行也能覆盖终端里残留的旧模型选择。输入 `/usage` 查看已预占的真实请求次数，`/exit` 退出。不要把 Key 写入仓库；`.env.example` 仅列出配置名，程序不会自动读取它。`workbench/deepreason/learning_mvp/knowledge/` 是小型教学语料，并非完整计算机知识库。
+例如可以提问：
 
-学习笔记无需模型配置。先运行 `.\.venv\Scripts\python.exe run_learning.py --notes --thread note-demo` 查看当前版本；若为 0，运行 `.\.venv\Scripts\python.exe run_learning.py --save-note "复习哈希冲突" --thread note-demo --operation-id note-001 --expected-version 0` 保存，再用 `--note-receipt note-001 --thread note-demo` 核对。超时后保留原操作 ID 和正文；具体实验见[第十九课](docs/lessons/LEARNING_19_TOOL_EXECUTION_ASSURANCE.md)。笔记只按本地 thread 命名空间隔离，没有登录用户认证，也不会自动变成长期画像或 Skill。
+- 二叉树是什么？
+- 什么是哈希冲突？
+- 哈希表和二叉搜索树有什么区别？
+- 哈希表一定比平衡二叉搜索树快吗？比较精确查找和范围查询。
 
-无 Key 的 Skill 固定初态实验：`.\.venv\Scripts\python.exe scripts\eval_learning_skill_candidate.py`。它从测试笔记提出候选、拒绝过宽触发、模拟明确审批并回退，记录的是三例**触发判断**而非教学效果。手动操作及记忆边界见[第二十课](docs/lessons/LEARNING_20_MEMORY_AND_SKILL_LIFECYCLE.md)。
+输入 `/usage` 查看本地持久化请求计数，输入 `/exit` 退出。密钥仅在本机使用；程序不会自动读取 `.env` 文件。实际问答需要模型账户有可用额度，正常生成通常包含四次角色请求。
 
-批准前/后七组固定初态控制流回放可运行 `.\.venv\Scripts\python.exe scripts\replay_learning_skill_paths.py`；同一语料指纹、新会话和脚本模型下核对终态、Gate、发布、模型调用和失败会话边界。结果与答案质量限制见[第二十一课](docs/lessons/LEARNING_21_PAIRED_REPLAY_BOUNDARIES.md)。
+学习笔记可以通过 `run_learning.py --notes` 和 `--save-note` 等明确命令操作，完整参数见 `run_learning.py --help`；保存需要操作 ID 和当前版本，普通提问不会自动保存为笔记或画像。
 
-答案级离线诊断可运行 `.\.venv\Scripts\python.exe scripts\eval_learning_answers.py`。六题区分合格资料是否出现、答复字面要点是否覆盖及严格题是否扣稿；标签未经独立人工复核，字面检查不是语义准确率。缺口与发布契约分别见[第二十二课](docs/lessons/LEARNING_22_ANSWER_QUALITY_PROBE.md)、[第二十三课](docs/lessons/LEARNING_23_STRICT_ANSWER_COVERAGE_CONTRACT.md)。
-
-三组 Skill 答案/代价对照入口为 `.\.venv\Scripts\python.exe scripts\run_learning_experiment.py`，默认只显示计划；加 `--offline` 才执行脚本实验，并在 `artifacts/experiments/` 留下六份隐藏版本标签的答复复核包与待填评分表。逐次记录角色、失败、token 与耗时，缺 usage 或人工评分时保持未测。真实千问必须显式加 `--qwen`，另有本轮请求限额；2026-10-15 实测第一条请求 HTTP 403 即停止，只新增 1 次预占，没有可评分答案。内容绑定评分与使用方法见[第二十四课](docs/lessons/LEARNING_24_PAIRED_QUALITY_AND_COST_EXPERIMENT.md)。
-
-## 验证与边界
-
-最简单的离线验收是在仓库根目录运行 `.\.venv\Scripts\python.exe scripts\verify_learning_paths.py`；当前十一例包含正常发布、覆盖缺失扣稿、无效路由复核和坏交付等情况，路径覆盖口径、预期结果与实测见[最小闭环测试报告](docs/MVP_TEST_REPORT.md)。运行 `.\.venv\Scripts\python.exe scripts\eval_bounded_recovery.py` 可复现相同初态下检索预算 1 次与 2 次的三组开关对照。
-
-在 `workbench/deepreason` 目录运行离线测试：
+## 验证
 
 ```powershell
-$env:PYTHONPATH='src'
-..\..\.venv\Scripts\python.exe -m unittest discover -s tests -q
+# 有限终态验收：正常发布、资料不足、危险动作、坏路由与坏交付
+.\.venv\Scripts\python.exe scripts\verify_learning_paths.py
 ```
 
-最近一次完整回归及已观察的失败记录见[项目状态](docs/PROJECT_STATUS.md)。评测题与无模型诊断器分别位于 `workbench/deepreason/evals/` 和 `scripts/eval_learning_baseline.py`。当前的“语义”检索是轻量词项相似度，“Graph”是词项共现；没有 Embedding、实体多跳图谱或经过测量的全局答案准确率。比较题的计划仅支持三个确定性任务及一次有界本地补查，普通题 Planner 仍是固定文字步骤；只有一条工作流边接入运行时交付契约，名为 `verify` 的上游节点也不核验 Worker 的最终答案。
+离线验收使用固定模型回执检查正常发布与失败拦截，不能代替真实模型的内容质量验收。测试方法和路径覆盖口径见[测试说明](docs/MVP_TEST_REPORT.md)；其中的结果应按报告所标版本与日期理解。
 
-最新完整回归 **249/249**、十一例入口 **11/11**、七组 Skill 回放 **7/7**。真实 qwen-max 服务已跑通，但固定六题仍未全部通过；调用累计 **67/100**，失败、修复与真实边界见[第二十九课](docs/lessons/LEARNING_29_REAL_QWEN_AND_GOAL_BOUNDARY.md)。六题和会话/笔记/Skill 操作闭环见[第二十八课](docs/lessons/LEARNING_28_APPLICATION_WALKTHROUGH.md)；修复 Skill 回退后旧候选重新有效的问题，候选同时绑定内容与单调状态修订号，旧待批候选需重新提出。普通生成正常为 4 次角色调用，标准止答/拒绝仍 2 次；已测首个成功题约 40.991 秒，尚无提速结论；真实误拦率与总体质量未验收，盲目模型仍可能放行语义错误。发布、路由及会话保护分别见[第二十七课](docs/lessons/LEARNING_27_GUIDED_ANSWER_RELEASE.md)、[第二十六课](docs/lessons/LEARNING_26_ROUTE_REVIEW_CONTRACT.md)、[第二十五课](docs/lessons/LEARNING_25_SESSION_EXECUTION_AND_COMMIT.md)。没有问答请求幂等、排队或 checkpoint 续跑。
+## 当前边界
 
-## 来源
+- 使用小型本地课程语料，跨主题问题需要补充有出处的资料。
+- 引用存在不等于整条结论都有充分支持；证据外扩展与最终审查的历史条件传递仍在收尾范围内。
+- 当前面向本地单用户，线程隔离不等于登录用户认证；笔记保障只覆盖已接入的明确写动作。
+- Skill 是一条固定教学规则的受控更新实验，教学效果尚待对照验证；不宣称自主进化或整体性能提升。
 
-- DeepReason 固定上游提交：`e98313d661527c3aa6677eec08a3b54b4ab88a33`，详情见[来源记录](UPSTREAM.md)。原仓库快照未包含 LICENSE 文件；维护者此前表示已从作者处确认 MIT 授权。这里不把上游代码写成原创成果。
-- OpenDSA 教材原文及本项目中文提要的来源、固定提交、哈希与许可见 `workbench/deepreason/learning_mvp/SOURCE_MANIFEST.json`、`CURATED_SOURCE_MANIFEST.json` 和随附的 `source/OpenDSA/MIT-license.txt`。
+## 来源与改动归属
 
-本仓库不包含本地密钥、会话、个人记录、调用计数、原始运行产物、虚拟环境或交接压缩包；固定上游完整快照可通过上述提交获取。
+基础编排、Workflow Spec、检索组件和 SessionStore 复用 DeepReason；学习场景、有限计划、交付检查、发布保护、会话与笔记适配、Skill 状态控制及评测由本项目在 AI 协助下实现和验证。逐项说明见[改动归属](workbench/PROVENANCE.md)。
+
+上游版本、复用范围，以及 OpenDSA 教材资料的来源与许可统一见[来源说明](UPSTREAM.md)。保留随附的第三方许可文本。
